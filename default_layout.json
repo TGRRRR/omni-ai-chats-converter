@@ -1,0 +1,15 @@
+{
+  "frontmatter": {
+    "title": false,
+    "date": true,
+    "provider": true,
+    "url": true
+  },
+  "user_heading": "# Me",
+  "assistant_heading": "# Assistant",
+  "thinking_heading": "# Thinking",
+  "include_thinking": false,
+  "separator": "",
+  "heading_downscale": true,
+  "timestamp_format": "%Y-%m-%d"
+}
