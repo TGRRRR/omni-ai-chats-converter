@@ -31,6 +31,7 @@ class OmniConverterApp:
         self.selected_provider: str = "auto"
         self.layout = config.load_layout()
         self.detected_provider: str = "unknown"
+        self.cached_json_data = None
 
         # Create UI
         self._create_widgets()
@@ -252,6 +253,7 @@ class OmniConverterApp:
         if filename:
             self.input_file = filename
             self.input_path_label.config(text=Path(filename).name, foreground="black")
+            self.cached_json_data = detector.load_json_file(filename)
             self._auto_detect_provider()
             self._update_convert_button()
 
@@ -332,8 +334,10 @@ class OmniConverterApp:
         self.root.update()
 
         try:
-            # Load JSON
-            json_data = detector.load_json_file(self.input_file)
+            # Re-use cached JSON (loaded on file selection)
+            json_data = self.cached_json_data
+            if json_data is None:
+                json_data = detector.load_json_file(self.input_file)
             if json_data is None:
                 raise ValueError("Failed to load JSON file")
 
@@ -354,22 +358,8 @@ class OmniConverterApp:
             # Render
             rendered = renderer.render_conversations(conversations, self.layout)
 
-            # Write files
-            output_path = Path(self.output_folder)
-            count = 0
-            for filename, content in rendered:
-                filepath = output_path / filename
-                # Handle duplicates
-                counter = 1
-                while filepath.exists():
-                    stem = filepath.stem
-                    ext = filepath.suffix
-                    filepath = output_path / f"{stem} {counter}{ext}"
-                    counter += 1
-
-                with open(filepath, "w", encoding="utf-8") as f:
-                    f.write(content)
-                count += 1
+            # Write files using shared helper
+            count = renderer.write_rendered_files(rendered, self.output_folder)
 
             self.status_var.set(f"Done: {count} files created")
             messagebox.showinfo(

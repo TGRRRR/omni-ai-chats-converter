@@ -19,6 +19,9 @@ def get_parser(provider: str) -> BaseParser | None:
     }
     parser_class = provider_map.get(provider.lower())
     if parser_class:
+        for p in PARSERS:
+            if isinstance(p, parser_class):
+                return p
         return parser_class()
     return None
 

@@ -1,4 +1,7 @@
+import os
 import re
+from pathlib import Path
+
 from core.models import Conversation, Message
 
 
@@ -121,13 +124,34 @@ def get_unique_filename(base: str, used: dict) -> str:
     if base not in used:
         return base
 
-    base_name, ext = (
-        os.path.splitext(base) if "os" in globals() else (base.rsplit(".", 1)[0], ".md")
-    )
+    base_name, ext = os.path.splitext(base)
     counter = 1
     while f"{base_name} {counter}{ext}" in used:
         counter += 1
     return f"{base_name} {counter}{ext}"
 
 
-import os
+def write_rendered_files(
+    rendered: list[tuple[str, str]],
+    output_dir: Path,
+) -> int:
+    """
+    Write rendered files to disk, handling filesystem-level duplicates.
+    Renderer already guarantees batch-level uniqueness; this handles
+    pre-existing files on disk.
+    Returns the number of files written.
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for filename, content in rendered:
+        filepath = output_dir / filename
+        stem = filepath.stem
+        ext = filepath.suffix
+        counter = 1
+        while filepath.exists():
+            filepath = output_dir / f"{stem} {counter}{ext}"
+            counter += 1
+        filepath.write_text(content, encoding="utf-8")
+        count += 1
+    return count

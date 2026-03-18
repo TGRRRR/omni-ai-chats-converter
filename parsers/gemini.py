@@ -83,44 +83,33 @@ class GeminiParser(BaseParser):
     """Parser for Google Takeout Gemini exports."""
 
     @staticmethod
+    def _looks_like_gemini(data: dict) -> bool:
+        """Check if a dict looks like a Gemini Takeout record."""
+        header = data.get("header", "")
+        products = data.get("products", [])
+        title_url = data.get("titleUrl", "")
+
+        if "Gemini" in header or "Bard" in header:
+            return True
+        if isinstance(products, list):
+            for p in products:
+                if "Gemini" in str(p) or "Bard" in str(p):
+                    return True
+        if "gemini.google.com" in title_url:
+            return True
+        if "safeHtmlItem" in data:
+            return True
+        return False
+
+    @staticmethod
     def can_parse(json_data: dict | list) -> bool:
-        # Handle list of records (Google Takeout format)
         if isinstance(json_data, list):
-            for item in json_data:
-                if isinstance(item, dict):
-                    header = item.get("header", "")
-                    products = item.get("products", [])
-                    title_url = item.get("titleUrl", "")
-
-                    if "Gemini" in header or "Bard" in header:
-                        return True
-                    if isinstance(products, list):
-                        for p in products:
-                            if "Gemini" in str(p) or "Bard" in str(p):
-                                return True
-                    if "gemini.google.com" in title_url:
-                        return True
-                    if "safeHtmlItem" in item:
-                        return True
-            return False
-
-        # Single record dict
+            return any(
+                isinstance(item, dict) and GeminiParser._looks_like_gemini(item)
+                for item in json_data
+            )
         if isinstance(json_data, dict):
-            # Check for Gemini Takeout structure
-            header = json_data.get("header", "")
-            products = json_data.get("products", [])
-            title_url = json_data.get("titleUrl", "")
-
-            if "Gemini" in header or "Bard" in header:
-                return True
-            if isinstance(products, list):
-                for p in products:
-                    if "Gemini" in str(p) or "Bard" in str(p):
-                        return True
-            if "gemini.google.com" in title_url:
-                return True
-            if "safeHtmlItem" in json_data:
-                return True
+            return GeminiParser._looks_like_gemini(json_data)
         return False
 
     def parse(self, json_data: dict | list) -> list[Conversation]:
@@ -178,20 +167,7 @@ class GeminiParser(BaseParser):
         return result
 
     def _is_gemini_record(self, record: dict) -> bool:
-        """Check if record is a Gemini record."""
-        header = record.get("header", "")
-        products = record.get("products", [])
-        title_url = record.get("titleUrl", "")
-
-        if "Gemini" in header or "Bard" in header:
-            return True
-        if isinstance(products, list):
-            for p in products:
-                if "Gemini" in str(p) or "Bard" in str(p):
-                    return True
-        if "gemini.google.com" in title_url:
-            return True
-        return False
+        return self._looks_like_gemini(record)
 
     def _parse_record(self, record: dict) -> list[Message]:
         """Parse a single Takeout record into Messages (user + assistant)."""

@@ -41,6 +41,11 @@ def load_layout(config_path: Path | None = None) -> dict[str, Any]:
         # Merge with defaults to ensure all keys exist
         merged = DEFAULT_LAYOUT.copy()
         merged.update(config)
+        # Deep-merge frontmatter so partial saves don't wipe keys
+        merged["frontmatter"] = {
+            **DEFAULT_LAYOUT["frontmatter"],
+            **config.get("frontmatter", {}),
+        }
         return merged
     except (json.JSONDecodeError, IOError):
         return DEFAULT_LAYOUT.copy()

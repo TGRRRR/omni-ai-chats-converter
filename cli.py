@@ -95,27 +95,10 @@ def main():
         if args.output:
             output_dir = Path(args.output)
         else:
-            # Default: same folder as input, with _converted suffix
             input_path = Path(args.input)
             output_dir = input_path.parent / f"{input_path.stem}_converted"
 
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        count = 0
-        for filename, content in rendered:
-            filepath = output_dir / filename
-            # Handle duplicates
-            counter = 1
-            while filepath.exists():
-                stem = filepath.stem
-                ext = filepath.suffix
-                filepath = output_dir / f"{stem} {counter}{ext}"
-                counter += 1
-
-            with open(filepath, "w", encoding="utf-8") as f:
-                f.write(content)
-            count += 1
-
+        count = renderer.write_rendered_files(rendered, output_dir)
         print(f"Created {count} file(s) in {output_dir}")
 
 
