@@ -11,33 +11,55 @@ Converts chat exports from AI providers into consistently formatted Markdown fil
 
 ---
 
+## Background
+
+This project started because existing tools were either CLI-only, vendor-specific, or required complex setups. The goal was a single app that handles ChatGPT, Claude, DeepSeek, Gemini, and other providers — with fully customizable markdown output formatting.
+
+### Why Not Existing Tools?
+
+| Tool | Type | Providers | Customizable Format |
+|------|------|-----------|-------------------|
+| `ai-chat-md-export` | CLI (npm/TS) | ChatGPT, Claude only | Fixed format |
+| `ai-chat-exporter` | Tampermonkey | ChatGPT, Claude, Copilot, Gemini | YAML + TOC |
+| AI Exporter (Chrome) | Browser ext | 10+ platforms | None |
+| `chatgpt-markdown` | CLI (Python) | ChatGPT only | `config.json` |
+
+None were local desktop GUI apps with unified multi-provider support + format customization.
+
+### Auto-Detection
+
+You **can** structurally fingerprint most formats:
+- **ChatGPT** → top-level `mapping` key with node tree, `author.role`
+- **Claude** → `chat_messages[]` with `sender: "human"|"assistant"`
+- **DeepSeek** → different schema with `fragments[]`
+- **Gemini Takeout** → `header` contains "Gemini"/"Bard", `safeHtmlItem` present
+- **Perplexity** → custom `perplexport` format
+
+Auto-detect as default, with manual vendor buttons for edge cases or unknown future formats.
+
+---
+
 ## Project Structure
 
 ```
 omni-ai-chats-converter/
 ├── SPEC.md                    # This file
 ├── TEST.md                    # Testing guide
-├── server.py                  # Local HTTP server (pure stdlib, ~20 lines)
-├── build.spec                 # PyInstaller config
+├── server.py                  # Local HTTP server (pure stdlib, ~17 lines)
+├── default_layout.json        # Default layout settings
 │
-├── web/                       # THE APP — pure HTML/CSS/JS
-│   ├── index.html             # App shell
-│   ├── css/
-│   │   └── style.css          # Styling (dark/light mode, responsive)
-│   ├── js/
-│   │   ├── app.js            # UI logic, event handlers, state management
-│   │   ├── converter.js       # All conversion logic (parsers + renderer)
-│   │   ├── html2md.js         # HTML→Markdown converter
-│   │   └── download.js        # File + ZIP download helpers
-│   └── assets/
-│
-└── omni-ai-chats-converter/  # OLD — Python standalone (reference only)
-    ├── cli.py
-    ├── core/
-    └── parsers/
+└── web/                       # THE APP — pure HTML/CSS/JS
+    ├── index.html             # App shell (two-column layout)
+    ├── css/
+    │   └── style.css          # Styling (dark/light mode, responsive, viewer panel)
+    └── js/
+        ├── app.js             # UI logic, state management, markdown preview renderer
+        ├── converter.js       # All conversion logic (detector, 4 parsers, renderer)
+        ├── html2md.js         # HTML→Markdown converter
+        └── download.js         # File + ZIP download helpers
 ```
 
-**Key point:** `web/` is the entire application. `server.py` is only a static file server that opens a browser window. No logic whatsoever in Python.
+**Key point:** `web/` is the entire application. `server.py` is a minimal static file server that opens a browser window. Zero dependencies — pure HTML/CSS/JS.
 
 ---
 
@@ -48,10 +70,9 @@ omni-ai-chats-converter/
 | Mode | How it runs | What Python does |
 |------|-------------|-----------------|
 | **GitHub Pages** | Browser opens static URL | Nothing — pure static hosting |
-| **Local .exe** | PyInstaller exe starts local server | Serves static files, opens browser |
-| **Local dev** | `python server.py` | Serves static files, opens browser |
+| **Local server** | `python server.py` | Serves static files, opens browser |
 
-All three use the **same `web/` directory**.
+Both use the **same `web/` directory**.
 
 ### Data Flow
 
@@ -74,7 +95,13 @@ List of Conversation objects (plain JS objects)
 Renderer (JS) → List of {filename, content}
     │
     ▼
-Display file list + trigger downloads
+Display file list in results panel
+    │
+    ▼
+Click card → open in viewer panel (raw text or rendered markdown)
+    │
+    ▼
+Download individual files or ZIP archive
 ```
 
 ### JavaScript Data Model
@@ -102,14 +129,7 @@ Display file list + trigger downloads
 ### Web (GitHub Pages)
 Open the GitHub Pages URL in any browser.
 
-### Local App
-```bash
-pip install -r requirements.txt
-python server.py
-```
-Or double-click `OmniAIConverter.exe` (from PyInstaller build).
-
-### Development
+### Local Development
 ```bash
 python server.py
 # Opens http://localhost:8765
@@ -153,23 +173,29 @@ Wrapper unwrapping: `conversations`, `chats`, `data`, `items` — applied before
 | `user_heading` | "# Me" | Heading for user messages |
 | `assistant_heading` | "# Assistant" | Heading for AI responses |
 | `thinking_heading` | "# Thinking" | Heading for thinking blocks |
-| `include_thinking` | true | Include thinking blocks (greyed out if no thinking blocks detected) |
-| `separator` | "" | Separator between messages |
-| `heading_downscale` | true | Downscale H1 in assistant content |
+| `include_thinking` | **false** | Include thinking blocks (opt-in; greyed out if no thinking blocks detected) |
+| `separator` | "" | Separator between messages: `---` (solid) or `***` (dotted) |
+| `heading_downscale` | true | Downscale headings in assistant content (`#` → `##`, `##` → `###`, etc.) |
 | `add_title_as_h1` | false | Add title as H1 at file top |
 | `timestamp_format` | "%Y-%m-%d" | Date format |
 | `gemini_group_gap_minutes` | 30 | Gap (minutes) to split Gemini records into separate conversations |
 | `gemini_keep_ungrouped` | false | If true: each Gemini record → separate file (ignore grouping) |
+| `user_compact` | false | Remove empty lines in user messages (preserve 1 blank line before tables) |
+| `assistant_compact` | false | Remove empty lines in assistant messages (preserve 1 blank line before tables) |
 
 Persisted via `localStorage`.
 
 ### Thinking Blocks UI
 
 The "Include thinking blocks" checkbox behavior:
-- **Greyed out** by default
+- **Opt-in by default** (disabled until thinking blocks are detected)
 - **Becomes active** if the loaded file contains thinking blocks (detected at parse time)
 - If `has_thinking: false` on all conversations → checkbox is disabled with label "Include thinking blocks (not available for this file)"
 - If `has_thinking: true` → checkbox is enabled with label "Include thinking blocks (DeepSeek)"
+
+### Compact Mode
+
+When `user_compact` or `assistant_compact` is enabled, consecutive empty lines are removed from message content. A single blank line is preserved before tables to ensure proper markdown rendering. Both options work independently.
 
 ### YAML Output
 
@@ -199,10 +225,9 @@ Hi there!
 - No thinking blocks in export format
 
 ### DeepSeek Parser
-- Parses `mapping` dict with numeric string keys (sorted numerically)
+- Parses `mapping` dict with numeric string keys (sorted by `message.create_time`)
 - Fragment types: `REQUEST`→user, `RESPONSE`→assistant, `THINK`/`THOUGHT`/`REASONING`/`CHAIN_OF_THOUGHT`→thinking
-- Rich thinking blocks — `has_thinking: true`
-- Thinking checkbox is active by default when this provider is detected
+- Rich thinking blocks — `has_thinking: true` when thinking fragments detected
 
 ### Gemini Parser
 - Processes Google Takeout `MyActivity.json` format
@@ -212,9 +237,10 @@ Hi there!
 - **Alternative mode:** `gemini_keep_ungrouped: true` — each record → one file
 - No thinking blocks, no URL extraction
 
-### ChatGPT Parser (Phase 3)
+### ChatGPT Parser
 - Structure similar to DeepSeek (`mapping` tree, `author.role`)
-- `has_thinking: false` initially — future o1/o3 exports may include thinking
+- Parses `content.parts[]` for message text
+- `has_thinking: false` — future o1/o3 exports may include thinking
 
 ---
 
@@ -279,16 +305,14 @@ Parsers are tried in order of confidence. Highest confidence wins.
 
 **None.** Zero external JS libraries. Zero Python dependencies for the web app.
 
-Python only needed for:
-- `server.py` — stdlib: `http.server`, `threading`, `webbrowser`, `os`, `sys`
-- PyInstaller build
+Python only needed for `server.py` — stdlib only: `http.server`, `threading`, `webbrowser`, `os`, `sys`
 
 ---
 
 ## Local Server
 
 ```python
-# server.py — Python stdlib only, ~20 lines
+# server.py — Python stdlib only, ~17 lines
 import http.server, threading, webbrowser, os, sys
 
 def start(port=8765):
@@ -307,56 +331,21 @@ def start(port=8765):
 
 ## Development Phases
 
-### ✅ Phase 1 — Architecture Fixes (DONE)
-Python standalone app bugs fixed.
+### ✅ All Implementation Complete
 
-### Phase 2 — Pure JS Web App (IN PROGRESS)
-Priority: HIGH.
+1. ✅ `web/js/html2md.js` — DOMParser + regex post-processing HTML→Markdown
+2. ✅ `web/js/converter.js` — detector (scored heuristics), 4 parsers (claude, deepseek, gemini, chatgpt), renderer, registry
+3. ✅ `web/js/download.js` — file + ZIP downloads (native browser `Archive` API + JS fallback)
+4. ✅ `web/js/app.js` — UI logic, state management, event handlers, markdown preview renderer
+5. ✅ `web/index.html` — app shell (two-column layout, provider pills, drop zone, compact settings, viewer panel)
+6. ✅ `web/css/style.css` — modern responsive styling (dark/light, system fonts, viewer panel)
+7. ✅ `server.py` — local HTTP server (Python stdlib)
+8. ⬜ Deploy to GitHub Pages
 
-**Tasks:**
-1. `web/js/html2md.js` — DOMParser + regex post-processing HTML→Markdown
-2. `web/js/converter.js` — detector (scored heuristics), parsers (claude, deepseek, gemini), renderer, registry
-3. `web/js/download.js` — file + ZIP downloads (native browser `Archive` API)
-4. `web/js/app.js` — UI logic, state management, event handlers
-5. `web/index.html` — app shell (loading overlay, provider pills, drop zone, collapsible settings, results)
-6. `web/css/style.css` — modern responsive styling (dark/light, system fonts)
-7. `server.py` — local HTTP server
-8. `build.spec` — PyInstaller config
-9. Test on all vendors (compare output byte-for-byte with Python CLI)
-10. Deploy to GitHub Pages
+### Future Enhancements
 
-### Phase 3 — New Parsers (ChatGPT, AI Studio, Perplexity)
-Priority: HIGH. JSON structures to be provided by user.
-
-Each parser is added to `web/js/converter.js`. Thinking block detection populates `has_thinking` on each Conversation.
-
-### Phase 4 — Help + Feedback + Donate
-Priority: MEDIUM.
-
-- Export tutorials: collapsible "How to export?" per provider
-- Feedback: "Report a Bug" → GitHub Issues
-- Donate: "Support on Ko-Fi"
-
-### Phase 5 — Packaging + CI/CD
-Priority: MEDIUM.
-
-- PyInstaller builds for Windows, Linux, macOS
-- GitHub Actions on tag push
-
-### Deferred
 - **Attachments handling** — extract refs, emit `![]()`, copy to `_attachments/`
-- **Visual preview** — Markdown preview pane
 - **Schema fingerprinting detector** — replace heuristic scoring with structural similarity matching
 - **Filename collision robustness** — improve `sanitize_filename()` to handle edge cases (truncation collisions, `_` → space collisions)
-
----
-
-## Reference Projects (Read-Only)
-
-| File | Notes |
-|------|-------|
-| `Reference projects/claude_export_converter.py` | Claude parser reference |
-| `Reference projects/gemini-to-obsidian/gemini-to-obsidian.py` | Gemini parser reference |
-| `Reference projects/deepseek_export_converter/deepseek_export.py` | DeepSeek parser reference |
-
-These are the reference implementations used to build the JS parsers. The JS versions follow the same logic.
+- **Export tutorials** — collapsible "How to export?" per provider
+- **New parsers** — AI Studio, Perplexity, or other providers (JSON structures to be provided)

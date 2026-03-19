@@ -1,6 +1,6 @@
 # Testing Guide
 
-This file documents how to test the Omni AI Converter. Run these steps after any code changes.
+This file documents how to test the Omni AI Converter web app. Run these steps after any code changes.
 
 ## Test Data
 
@@ -10,71 +10,9 @@ All JSON test files are in `../Chats/` (repo root):
 - `Google.json` — Google Takeout Gemini (1816 activity records → ~666 grouped)
 - `chatGPT.json` — ChatGPT export (598 conversations)
 
-Export outputs go to `../Exports/{Claude,Deepseek,Google}/`.
-
 ---
 
-## Python CLI Tests (legacy — reference implementation)
-
-### Quick Test (all vendors)
-
-From the `omni-ai-chats-converter/` directory:
-
-```bash
-# Claude
-python cli.py "../Chats/Claude.json" -o "../Exports/Claude"
-
-# DeepSeek
-python cli.py "../Chats/deepseek.json" -o "../Exports/Deepseek"
-
-# Google/Gemini
-python cli.py "../Chats/Google.json" -o "../Exports/Google"
-```
-
-Expected output:
-- Claude: auto-detected as `claude`, ~27 files
-- DeepSeek: auto-detected as `deepseek`, ~59 files
-- Google: auto-detected as `gemini`, ~666 files
-
-### Verification Steps
-
-**1. Check CLI output** — no errors.
-
-**2. Spot-check output files** — one per vendor:
-
-```
-Claude — YAML frontmatter with date + provider, # Me / # Assistant headings
-DeepSeek — same + # Thinking blocks, [citation:N] patterns
-Gemini — grouped multi-turn, HTML→Markdown lists/code/bold
-```
-
-**3. Verify expected file counts:**
-
-| Vendor   | Input items | Expected output files |
-|----------|-------------|---------------------|
-| Claude   | 28         | ~27                 |
-| DeepSeek | 59         | ~59                 |
-| Gemini   | 1816 recs  | ~666 (grouped)      |
-
-**4. Special cases:**
-- DeepSeek thinking blocks (`# Thinking`)
-- DeepSeek citations (`[citation:N]`)
-- Gemini HTML→Markdown (`* ` lists, ` ``` ` code blocks, `**bold**`)
-- Cyrillic/Unicode text
-- No duplicate filenames (e.g. `file 1 1.md`)
-
-### Syntax & Import Check
-
-```bash
-python -m py_compile core/renderer.py core/config.py parsers/registry.py parsers/gemini.py cli.py gui/app.py
-python -c "from core import renderer, config; from parsers import registry; from gui import app; print('All imports OK')"
-```
-
----
-
-## Web App Tests (main implementation)
-
-### Running the web app
+## Running the Web App
 
 **Development:**
 ```bash
@@ -85,87 +23,100 @@ python server.py
 
 **GitHub Pages:** Open the deployed URL.
 
-### Quick Test (all vendors)
+---
 
-1. Open `web/index.html` in browser
+## Quick Test (all vendors)
+
+1. Open `web/index.html` in browser (or the deployed URL)
 2. Upload each JSON file and verify conversion
 
-### Verification Steps
+---
 
-**1. Provider auto-detection**
+## Verification Steps
+
+### 1. Provider auto-detection
 - Upload `Claude.json` → "Claude" highlighted
 - Upload `deepseek.json` → "DeepSeek" highlighted
 - Upload `Google.json` → "Gemini" highlighted
+- Upload `chatGPT.json` → "ChatGPT" highlighted
 
-**2. Thinking checkbox behavior**
+### 2. Thinking checkbox behavior
 - Load `Claude.json` → "Include thinking blocks" checkbox is **disabled** (greyed out), label says "(not available for this file)"
-- Load `deepseek.json` → "Include thinking blocks" checkbox is **enabled**, label says "(DeepSeek)"
-- Toggle thinking off → verify `# Thinking` blocks disappear from output
+- Load `deepseek.json` → "Include thinking blocks" checkbox is **enabled but unchecked** (opt-in), label says "(DeepSeek)"
 - Toggle thinking on → verify `# Thinking` blocks present in output
+- Toggle thinking off → verify `# Thinking` blocks disappear from output
 
-**3. Manual override**
-- Load `deepseek.json`, manually switch to "Claude" → conversion still works (parser falls through to generic_parse)
-- Or: force a wrong provider, verify graceful handling
+### 3. Manual override
+- Load a file, manually switch provider → conversion still works
 
-**4. Unknown format handling**
+### 4. Unknown format handling
 - Load a JSON file that doesn't match any parser → warning banner "Unknown format — manual provider selection required" appears
 - User selects a provider → conversion proceeds
-- Generic parse is **never called automatically**
 
-**5. Settings**
+### 5. Settings
 - Toggle all frontmatter fields
 - Change heading labels
-- Toggle separator
+- Set separator to `---` → rendered as solid line in viewer
+- Set separator to `***` → rendered as dotted line in viewer
 - Toggle heading downscale
 - Toggle `add_title_as_h1`
+- Toggle `user_compact` → empty lines removed from user messages
+- Toggle `assistant_compact` → empty lines removed from assistant messages
 - Verify each change reflected in output
 
-**6. Gemini grouping settings**
+### 6. Gemini grouping settings
 - Load `Google.json` with default settings (30-min gap) → ~666 files
 - Set `gemini_keep_ungrouped: true` → ~1816 files (one per record)
 - Set `gemini_group_gap_minutes` to 5 → more files (stricter grouping)
 - Set `gemini_group_gap_minutes` to 120 → fewer files (looser grouping)
 
-**7. Downloads**
+### 7. Viewer panel
+- Click any result card → viewer panel opens on right
+- Viewer shows rendered markdown by default
+- Toggle button switches between rendered preview and raw markdown text
+- Close button (×) closes viewer panel
+- Compact mode changes visible in viewer immediately
+
+### 8. Downloads
 - Individual file download → file saves with correct name
 - "Download All as ZIP" → single ZIP with all .md files, correct filenames
 
-**8. Settings persistence**
+### 9. Settings persistence
 - Change settings, reload page → settings retained from localStorage
 
-**9. Large file performance**
+### 10. Large file performance
 - Load `Google.json` (1816 records) → should not hang browser
 - Loading indicator visible during parse
 
-**10. Error handling**
+### 11. Error handling
 - Upload invalid JSON → error message shown, no crash
 - Upload empty file → graceful error
 
-### Output Comparison (web vs CLI)
+---
 
-Web output must match CLI output for the same layout settings. Compare:
+## Special Cases to Check
 
-| Check | Claude | DeepSeek | Gemini |
-|-------|--------|----------|--------|
-| Frontmatter fields | ✓ | ✓ | ✓ |
-| Heading labels | ✓ | ✓ | ✓ |
-| Thinking blocks | N/A | ✓ | N/A |
-| Thinking toggle | N/A | ✓ | N/A |
-| HTML→Markdown quality | — | — | ✓ |
-| Cyrillic/Unicode | ✓ | ✓ | ✓ |
-| File count (default) | ✓ | ✓ | ✓ |
-| File count (ungrouped) | — | — | ✓ |
+- DeepSeek thinking blocks (`# Thinking`)
+- DeepSeek citations (`[citation:N]`)
+- Gemini HTML→Markdown (`* ` lists, ` ``` ` code blocks, `**bold**`)
+- Cyrillic/Unicode text
+- Tables render correctly with compact mode (blank line preserved before table)
+- Compact mode removes empty lines but preserves paragraph structure
+- No duplicate filenames
 
 ---
 
 ## Regression Checklist (after any change)
 
-After modifying any parser, renderer, or detector:
-
-- [ ] All Python CLI tests still pass
-- [ ] All web app tests still pass
+- [ ] Provider auto-detection works for all 4 providers
 - [ ] Thinking blocks correct in DeepSeek output
 - [ ] HTML→Markdown correct in Gemini output (lists, code, bold, links)
+- [ ] Heading downscale works correctly (`#` → `##`, `##` → `###`, etc.)
+- [ ] Compact mode removes empty lines but preserves table formatting
+- [ ] Separator renders correctly (`---` solid, `***` dotted)
+- [ ] Viewer panel renders markdown (YAML, headings, code, tables)
 - [ ] No duplicate filenames
 - [ ] Cyrillic/Unicode not garbled
 - [ ] Settings persist across page reload
+- [ ] Downloads work (individual files and ZIP)
+- [ ] Large files don't freeze the browser
