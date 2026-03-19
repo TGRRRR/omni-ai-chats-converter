@@ -15,7 +15,9 @@
         timestamp_format: '%Y-%m-%d',
         gemini_group_gap_minutes: 30,
         gemini_keep_ungrouped: false,
-        viewer_enabled: true
+        viewer_enabled: true,
+        user_compact: false,
+        assistant_compact: false
     };
 
     var state = {
@@ -363,6 +365,8 @@
         setCheckbox('headingDownscale', layout.heading_downscale !== false);
         setCheckbox('addTitleH1', layout.add_title_as_h1 === true);
         setCheckbox('geminiKeepUngrouped', layout.gemini_keep_ungrouped === true);
+        setCheckbox('userCompact', layout.user_compact === true);
+        setCheckbox('assistantCompact', layout.assistant_compact === true);
         var slider = document.getElementById('geminiGapSlider');
         if (slider) slider.value = layout.gemini_group_gap_minutes || 30;
         updateSliderDisplay();
@@ -442,53 +446,148 @@
         });
     }
 
-    function parseBasicMarkdown(md) {
-        if (!md) return '';
-        var html = md;
-
-        html = html.replace(/^---\n([\s\S]*?)\n---/g, '<div class="yaml-frontmatter">$1</div>');
-
-        html = html.replace(/^###### (.*$)/gim, '<h6>$1</h6>');
-        html = html.replace(/^##### (.*$)/gim, '<h5>$1</h5>');
-        html = html.replace(/^#### (.*$)/gim, '<h4>$1</h4>');
-        html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
-        html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
-        html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
-
-        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-        html = html.replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>');
-
-        html = html.replace(/^\* (.*$)/gim, '<ul><li>$1</li></ul>');
-        html = html.replace(/<\/ul>\n<ul>/g, '\n');
-
-        html = html.replace(/```[\s\S]*?```/g, function(m) {
-            return '<pre><code>' + m.slice(3, -3).replace(/```\w*\n?/g, '') + '</code></pre>';
-        });
-        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-
-        html = html.replace(/^\|(.+)\|/gim, function(match) {
-            var cells = match.split('|').filter(function(c) { return c.trim(); });
-            var row = '<tr>' + cells.map(function(c) { return '<td>' + c.trim() + '</td>'; }).join('') + '</tr>';
-            return row;
-        });
-        html = html.replace(/(<tr>[\s\S]*?<\/tr>(\n<tr>[\s\S]*?<\/tr>)*)/gi, '<table>$1</table>');
-        html = html.replace(/<td>(-+)<\/td>/g, '');
-
-        var lines = html.split('\n');
-        var inBlock = false;
-        var newLines = [];
+    function parseYamlFrontmatter(lines) {
+        var items = [];
         for (var i = 0; i < lines.length; i++) {
-            var l = lines[i].trim();
-            var isBlockTag = /^(<h[1-6]|<p>|<ul>|<ol>|<pre|<blockquote|<table|<div)/.test(l) || /^(<\/|<ul><li)/.test(l) || l === '<li></li>' || l === '';
-            if (!isBlockTag && l !== '' && !l.startsWith('<')) {
-                newLines.push('<p>' + lines[i] + '</p>');
-            } else {
-                newLines.push(lines[i]);
+            var line = lines[i];
+            var colonIdx = line.indexOf(':');
+            if (colonIdx > 0) {
+                var key = line.substring(0, colonIdx).trim();
+                var value = line.substring(colonIdx + 1).trim().replace(/^["']|["']$/g, '');
+                items.push('<div class="yaml-row"><span class="yaml-key">' + escapeHtml(key) + '</span><span class="yaml-colon">: </span><span class="yaml-value">' + escapeHtml(value) + '</span></div>');
             }
         }
-        return newLines.join('\n');
+        return '<div class="yaml-frontmatter"><div class="yaml-content">' + items.join('') + '</div></div>';
+    }
+
+    function parseBasicMarkdown(md) {
+        if (!md) return '';
+        var lines = md.split('\n');
+        var result = [];
+        var i = 0;
+        if (lines[0] && lines[0].trim() === '---') {
+            var yamlLines = [];
+            i = 1;
+            while (i < lines.length && lines[i].trim() !== '---') {
+                yamlLines.push(lines[i]);
+                i++;
+            }
+            i++;
+            if (yamlLines.length > 0) {
+                var yamlHtml = parseYamlFrontmatter(yamlLines);
+                result.push(yamlHtml);
+            }
+        }
+        while (i < lines.length) {
+            var line = lines[i];
+            var trimmedLine = line.trim();
+            if (trimmedLine === '---') {
+                result.push('<hr class="md-separator-solid">');
+                i++;
+                continue;
+            }
+            if (trimmedLine === '***') {
+                result.push('<hr class="md-separator-dotted">');
+                i++;
+                continue;
+            }
+            if (trimmedLine === '') {
+                var nextNonEmpty = i + 1;
+                while (nextNonEmpty < lines.length && lines[nextNonEmpty].trim() === '') nextNonEmpty++;
+                if (nextNonEmpty < lines.length && !lines[nextNonEmpty].trim().startsWith('#') && !lines[nextNonEmpty].trim().startsWith('```') && !lines[nextNonEmpty].trim().startsWith('|') && !lines[nextNonEmpty].trim().startsWith('>') && !lines[nextNonEmpty].trim().startsWith('-') && !lines[nextNonEmpty].trim().startsWith('*')) {
+                    result.push('<div class="para-gap"></div>');
+                }
+                i = nextNonEmpty;
+                continue;
+            }
+            var headingMatch = trimmedLine.match(/^(#{1,6})\s+(.*)$/);
+            if (headingMatch) {
+                var level = headingMatch[1].length;
+                var text = headingMatch[2];
+                result.push('<h' + level + '>' + escapeHtml(text) + '</h' + level + '>');
+                i++;
+                continue;
+            }
+            if (line.indexOf('```') !== -1) {
+                var codeLines = [];
+                var codeStart = line.indexOf('```');
+                if (codeStart > 0) {
+                    result.push('<p>' + escapeHtml(line.substring(0, codeStart)) + '</p>');
+                }
+                i++;
+                var lang = '';
+                var firstCodeLine = lines[i];
+                if (firstCodeLine && firstCodeLine.match(/^```/)) {
+                    lang = firstCodeLine.replace(/^```/, '').trim();
+                }
+                var codeContent = [];
+                while (i < lines.length && lines[i].indexOf('```') === -1) {
+                    codeContent.push(lines[i]);
+                    i++;
+                }
+                i++;
+                var codeText = codeContent.join('\n').replace(/\n+$/, '');
+                result.push('<pre class="code-block"><code' + (lang ? ' class="language-' + escapeHtml(lang) + '"' : '') + '>' + escapeHtml(codeText) + '</code></pre>');
+                continue;
+            }
+            if (line.match(/^\|(.+)\|$/)) {
+                var tableLines = [];
+                while (i < lines.length && lines[i].match(/^\|(.+)\|$/)) {
+                    tableLines.push(lines[i]);
+                    i++;
+                }
+                result.push(parseTable(tableLines));
+                continue;
+            }
+            if (line.match(/^>\s*(.*)$/)) {
+                var quoteLines = [];
+                while (i < lines.length && lines[i].match(/^>\s*(.*)$/)) {
+                    quoteLines.push(lines[i].replace(/^>\s*/, ''));
+                    i++;
+                }
+                result.push('<blockquote>' + escapeHtml(quoteLines.join(' ')) + '</blockquote>');
+                continue;
+            }
+            if (line.match(/^[-*]\s+(.*)$/)) {
+                var listLines = [];
+                while (i < lines.length && lines[i].match(/^[-*]\s+(.*)$/)) {
+                    listLines.push('<li>' + parseInlineMarkdown(lines[i].replace(/^[-*]\s+/, '')) + '</li>');
+                    i++;
+                }
+                result.push('<ul>' + listLines.join('') + '</ul>');
+                continue;
+            }
+            result.push('<p>' + parseInlineMarkdown(line) + '</p>');
+            i++;
+        }
+        return result.join('\n');
+    }
+
+    function parseInlineMarkdown(text) {
+        text = escapeHtml(text);
+        text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+        text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+        text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+        return text;
+    }
+
+    function parseTable(tableLines) {
+        if (tableLines.length === 0) return '';
+        var rows = [];
+        for (var i = 0; i < tableLines.length; i++) {
+            var cells = tableLines[i].split('|').filter(function(c, idx, arr) { return idx !== 0 && idx !== arr.length - 1; });
+            var rowClass = i === 0 ? ' class="table-header"' : '';
+            var cellsHtml = cells.map(function(c) {
+                return '<td>' + parseInlineMarkdown(c.trim()) + '</td>';
+            }).join('');
+            rows.push('<tr' + rowClass + '>' + cellsHtml + '</tr>');
+        }
+        return '<table>' + rows.join('') + '</table>';
+    }
+
+    function escapeHtml(text) {
+        return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     function openViewer(filename) {

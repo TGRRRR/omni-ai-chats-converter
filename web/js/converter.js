@@ -426,8 +426,33 @@
         return { provider: PROVIDER_UNKNOWN, conversations: [] };
     }
 
-    function downscaleHeadings(text) { return text.replace(/^#(?=\s)/gm, '#'); }
+    function downscaleHeadings(text) { return text.replace(/^(#{1,5})(?=\s)/gm, '$1#'); }
     function hasH1(text) { return /^#(?=\s)/m.test(text); }
+
+    function compactContent(content) {
+        var lines = content.split('\n');
+        var result = [];
+        var inTable = false;
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i];
+            var isEmpty = line.trim() === '';
+            if (isEmpty) {
+            } else {
+                var isTableLine = /^\s*\|/.test(line);
+                if (isTableLine) {
+                    if (!inTable && result.length > 0 && result[result.length - 1].trim() !== '') {
+                        result.push('');
+                    }
+                    inTable = true;
+                } else {
+                    inTable = false;
+                }
+                result.push(line);
+            }
+        }
+        while (result.length > 0 && result[result.length - 1].trim() === '') result.pop();
+        return result.join('\n');
+    }
 
     function renderMessage(message, layout) {
         var heading;
@@ -436,6 +461,8 @@
         else heading = layout.assistant_heading || '# Assistant';
         var content = message.content;
         if (message.role === 'assistant' && layout.heading_downscale !== false && hasH1(content)) content = downscaleHeadings(content);
+        var shouldCompact = (message.role === 'user' && layout.user_compact) || (message.role === 'assistant' && layout.assistant_compact);
+        if (shouldCompact) content = compactContent(content);
         return heading + '\n' + content;
     }
 
@@ -464,15 +491,15 @@
         var includeThinking = layout.include_thinking !== false;
         var separator = layout.separator || '';
         var msgList = conversation.messages;
-        for (var i = 0; i < msgList.length; i++) {
-            var msg = msgList[i];
-            if (msg.role === 'thinking' && !includeThinking) continue;
-            lines.push(renderMessage(msg, layout));
-            if (i < msgList.length - 1) {
-                var nextMsg = msgList[i + 1];
-                if (nextMsg.role === 'thinking' && !includeThinking) continue;
-                if (separator) lines.push('\n' + separator + '\n');
-                else lines.push('\n');
+        var visible = [];
+        for (var vi = 0; vi < msgList.length; vi++) {
+            if (msgList[vi].role !== 'thinking' || includeThinking) visible.push(msgList[vi]);
+        }
+        for (var i = 0; i < visible.length; i++) {
+            lines.push(renderMessage(visible[i], layout));
+            if (i < visible.length - 1) {
+                if (separator) lines.push('\n\n' + separator + '\n\n');
+                else lines.push('\n\n');
             }
         }
         return lines.join('');

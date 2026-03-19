@@ -219,23 +219,36 @@ header p { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
 }
 
 .markdown-reader-view { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.6; color: var(--text); padding-bottom: 24px; }
-.markdown-reader-view h1, .markdown-reader-view h2, .markdown-reader-view h3, .markdown-reader-view h4, .markdown-reader-view h5, .markdown-reader-view h6 { margin-top: 24px; margin-bottom: 12px; font-weight: 600; line-height: 1.25; }
-.markdown-reader-view h1 { font-size: 2em; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
-.markdown-reader-view h2 { font-size: 1.5em; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
-.markdown-reader-view h3 { font-size: 1.25em; }
-.markdown-reader-view p { margin-top: 0; margin-bottom: 16px; }
+.markdown-reader-view h1, .markdown-reader-view h2, .markdown-reader-view h3, .markdown-reader-view h4, .markdown-reader-view h5, .markdown-reader-view h6 { margin-top: 0; margin-bottom: 0; padding-bottom: 0; font-weight: 600; line-height: 1.25; }
+.markdown-reader-view h1 { font-size: 1.75em; }
+.markdown-reader-view h2 { font-size: 1.4em; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.markdown-reader-view h3 { font-size: 1.15em; }
+.markdown-reader-view h1 + p, .markdown-reader-view h2 + p, .markdown-reader-view h3 + p, .markdown-reader-view h4 + p, .markdown-reader-view h5 + p, .markdown-reader-view h6 + p { margin-top: 8px; }
+.markdown-reader-view p { margin: 0 0 12px; }
+.markdown-reader-view p + p { margin-top: 0; }
+.markdown-reader-view .para-gap { height: 12px; }
+.markdown-reader-view hr + p { margin-top: 12px; }
 .markdown-reader-view a { color: var(--accent); text-decoration: none; }
 .markdown-reader-view a:hover { text-decoration: underline; }
-.markdown-reader-view pre { background-color: var(--surface-hover); border-radius: 6px; padding: 12px; overflow: auto; font-family: Consolas, "Courier New", monospace; font-size: 13px; margin-bottom: 16px; border: 1px solid var(--border); }
-.markdown-reader-view code { background-color: rgba(110,118,129,0.4); border-radius: 4px; padding: 2px 4px; font-family: Consolas, "Courier New", monospace; font-size: 85%; }
-.markdown-reader-view pre code { background-color: transparent; padding: 0; font-size: 100%; border-radius: 0; }
-.markdown-reader-view blockquote { padding: 0 1em; color: var(--text-muted); border-left: 4px solid var(--border); margin: 0 0 16px 0; }
-.markdown-reader-view ul, .markdown-reader-view ol { margin-top: 0; margin-bottom: 16px; padding-left: 2em; }
-.markdown-reader-view table { display: block; width: 100%; width: max-content; max-width: 100%; overflow: auto; border-spacing: 0; border-collapse: collapse; margin-bottom: 16px; }
+.markdown-reader-view pre.code-block { background-color: var(--surface); border-radius: 6px; padding: 12px; overflow: auto; font-family: Consolas, "Courier New", monospace; font-size: 13px; margin: 12px 0; border: 1px solid var(--border); }
+.markdown-reader-view pre.code-block code { background: none; padding: 0; font-size: 100%; border-radius: 0; }
+.markdown-reader-view code { background-color: rgba(110,118,129,0.2); border-radius: 4px; padding: 2px 4px; font-family: Consolas, "Courier New", monospace; font-size: 85%; }
+.markdown-reader-view blockquote { padding: 4px 16px; color: var(--text-muted); border-left: 3px solid var(--accent); margin: 12px 0; }
+.markdown-reader-view ul, .markdown-reader-view ol { margin: 8px 0 12px; padding-left: 24px; }
+.markdown-reader-view li { margin: 4px 0; }
+.markdown-reader-view table { display: block; width: max-content; max-width: 100%; overflow: auto; border-spacing: 0; border-collapse: collapse; margin: 12px 0; }
 .markdown-reader-view table th, .markdown-reader-view table td { padding: 6px 13px; border: 1px solid var(--border); }
-.markdown-reader-view table tr { background-color: transparent; border-top: 1px solid var(--border); }
-.markdown-reader-view table tr:nth-child(2n) { background-color: rgba(110,118,129,0.1); }
-.markdown-reader-view .yaml-frontmatter { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-family: monospace; font-size: 12px; margin-bottom: 20px; color: var(--text-muted); white-space: pre-wrap; word-break: break-word; }
+.markdown-reader-view table tr { border-top: 1px solid var(--border); }
+.markdown-reader-view table tr:nth-child(2n) { background-color: rgba(110,118,129,0.08); }
+.markdown-reader-view .yaml-frontmatter { margin: 16px 0 20px; }
+.markdown-reader-view .yaml-content { padding: 8px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.markdown-reader-view .yaml-row { margin-bottom: 4px; }
+.markdown-reader-view .yaml-key { color: var(--accent); font-size: 13px; }
+.markdown-reader-view .yaml-colon { color: var(--text-muted); }
+.markdown-reader-view .yaml-value { color: var(--text-muted); font-size: 13px; }
+.markdown-reader-view hr.md-separator { border: none; border-top: 1px dashed var(--text-muted); margin: 20px 0; }
+.markdown-reader-view hr.md-separator-dotted { border: none; border-top: 1px dotted var(--text-muted); margin: 20px 0; }
+.markdown-reader-view hr.md-separator-solid { border: none; border-top: 2px solid var(--border); margin: 20px 0; }
 
 footer { display: flex; align-items: center; justify-content: center; padding-top: 8px; margin-top: 4px; color: var(--text-muted); font-size: 11px; flex-shrink: 0; border-top: 1px solid var(--border); }
 footer a { color: var(--accent); text-decoration: none; }
