@@ -255,8 +255,15 @@ header p { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
 .markdown-reader-view pre.code-block code { background: none; padding: 0; font-size: 100%; border-radius: 0; }
 .markdown-reader-view code { background-color: rgba(110,118,129,0.2); border-radius: 4px; padding: 2px 4px; font-family: Consolas, "Courier New", monospace; font-size: 85%; }
 .markdown-reader-view blockquote { padding: 4px 16px; color: var(--text-muted); border-left: 3px solid var(--accent); margin: 12px 0; }
-.markdown-reader-view ul, .markdown-reader-view ol { margin: 8px 0 12px; padding-left: 24px; }
-.markdown-reader-view li { margin: 4px 0; }
+.markdown-reader-view ul, .markdown-reader-view ol { margin: 8px 0 12px; padding-left: 24px; list-style-position: outside; }
+.markdown-reader-view li { margin: 4px 0; padding-left: 0; }
+.markdown-reader-view li > ul, .markdown-reader-view li > ol { margin: 4px 0; }
+.markdown-reader-view ul ul, .markdown-reader-view ol ul, .markdown-reader-view ul ol, .markdown-reader-view ol ol { padding-left: 20px; margin: 4px 0; }
+.markdown-reader-view ul { list-style-type: disc; }
+.markdown-reader-view ul ul { list-style-type: circle; list-style-position: outside; }
+.markdown-reader-view ul ul ul { list-style-type: square; list-style-position: outside; }
+.markdown-reader-view ol { list-style-type: decimal; }
+.markdown-reader-view li > p { margin: 0; }
 .markdown-reader-view table { display: block; width: max-content; max-width: 100%; overflow: auto; border-spacing: 0; border-collapse: collapse; margin: 12px 0; }
 .markdown-reader-view table th, .markdown-reader-view table td { padding: 6px 13px; border: 1px solid var(--border); }
 .markdown-reader-view table tr { border-top: 1px solid var(--border); }

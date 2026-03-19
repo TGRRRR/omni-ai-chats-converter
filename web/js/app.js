@@ -560,13 +560,11 @@
                 result.push('<blockquote>' + escapeHtml(quoteLines.join(' ')) + '</blockquote>');
                 continue;
             }
-            if (line.match(/^[-*]\s+(.*)$/)) {
-                var listLines = [];
-                while (i < lines.length && lines[i].match(/^[-*]\s+(.*)$/)) {
-                    listLines.push('<li>' + parseInlineMarkdown(lines[i].replace(/^[-*]\s+/, '')) + '</li>');
-                    i++;
-                }
-                result.push('<ul>' + listLines.join('') + '</ul>');
+            var listMatch = line.match(/^(\s*)[-*]\s+(.*)$/);
+            if (listMatch) {
+                var listResult = parseList(lines, i);
+                result.push(listResult.html);
+                i = listResult.nextIdx;
                 continue;
             }
             result.push('<p>' + parseInlineMarkdown(line) + '</p>');
@@ -602,6 +600,55 @@
             rows.push('<tr' + rowClass + '>' + cellsHtml + '</tr>');
         }
         return '<table>' + rows.join('') + '</table>';
+    }
+
+    function parseList(lines, startIdx) {
+        var items = [];
+        var baseIndent = 0;
+        var i = startIdx;
+        
+        while (i < lines.length) {
+            var line = lines[i];
+            var match = line.match(/^(\s*)[-*]\s+(.*)$/);
+            if (!match) break;
+            
+            var indent = match[1].length;
+            var content = match[2];
+            
+            if (baseIndent === 0) {
+                baseIndent = indent;
+            }
+            
+            if (indent < baseIndent) break;
+            
+            var itemContent = parseInlineMarkdown(content);
+            
+            var nestedHtml = '';
+            var j = i + 1;
+            while (j < lines.length) {
+                var nextMatch = lines[j].match(/^(\s*)[-*]\s+(.*)$/);
+                if (!nextMatch) {
+                    var paragraphMatch = lines[j].match(/^(\s+)(.+)$/);
+                    if (paragraphMatch && paragraphMatch[1].length > indent) {
+                        itemContent += ' ' + parseInlineMarkdown(paragraphMatch[2]);
+                        j++;
+                    } else {
+                        break;
+                    }
+                } else if (nextMatch[1].length > indent) {
+                    var nestedResult = parseList(lines, j);
+                    nestedHtml = nestedResult.html;
+                    j = nestedResult.nextIdx;
+                } else {
+                    break;
+                }
+            }
+            
+            items.push('<li>' + itemContent + nestedHtml + '</li>');
+            i = j;
+        }
+        
+        return { html: '<ul>' + items.join('') + '</ul>', nextIdx: i };
     }
 
     function escapeHtml(text) {
