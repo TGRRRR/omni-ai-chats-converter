@@ -66,9 +66,9 @@ List of Conversation objects (plain JS objects)
 ↓
 Renderer (JS) → List of {filename, content}
 ↓
-Display file list in results panel
+Display file list in results panel (lightweight cards)
 ↓
-Click card → open in viewer panel (raw text or rendered markdown)
+Click card → generate preview DOM for that note only (lazy rendering)
 ↓
 Download individual files or ZIP archive
 ```
@@ -145,14 +145,14 @@ Auto-detect as default, with manual vendor buttons for edge cases or unknown fut
 Detection is structural, not just key-presence. Each provider has a set of **required fields** with **minimum depth** checks
 	- not just "does `messages` exist" but "does `messages[0].sender` exist".
 
-| Provider | Required Fields | Confidence |
-|----------|----------------|------------|
-| DeepSeek | `mapping` (dict), `mapping[*].message.fragments` array | High |
-| Claude | `chat_messages` (array) OR `messages[0].sender` | High |
-| ChatGPT | `messages[0].role` AND no `sender` (distinguishes from Claude) | Medium |
-| Gemini | `header` contains "Gemini"/"Bard", OR `safeHtmlItem` present | High |
-| Unknown | None of the above matched |
-	- |
+| Provider | Required Fields                                                | Confidence |
+| -------- | -------------------------------------------------------------- | ---------- |
+| DeepSeek | `mapping` (dict), `mapping[*].message.fragments` array         | High       |
+| Claude   | `chat_messages` (array) OR `messages[0].sender`                | High       |
+| ChatGPT  | `messages[0].role` AND no `sender` (distinguishes from Claude) | Medium     |
+| Gemini   | `header` contains "Gemini"/"Bard", OR `safeHtmlItem` present   | High       |
+| Unknown  | None of the above matched                                      |            |
+
 Wrapper unwrapping: `conversations`, `chats`, `data`, `items`
 	- applied before detection.
 **Confidence scoring:** Each parser's `can_parse()` returns a confidence score (0–1). The detector picks the highest. If the top score is below a threshold, flag as "unknown format".
@@ -200,14 +200,19 @@ The "Include thinking blocks" checkbox behavior:
 - If `has_thinking: true` → checkbox is enabled with label "Include thinking blocks (DeepSeek)"
 ### Compact Mode
 When `user_compact` or `assistant_compact` is enabled, consecutive empty lines are removed from message content. A single blank line is preserved before tables to ensure proper markdown rendering. Both options work independently.
-### YAML Output
-```yamltitle: "Conversation Title"
+### Markdown Output
+```YAML
+---
+title: "Conversation Title"
 date: 2024-01-15
 provider: claude
 url: https://claude.ai/chat/...
-## Me
+---
+
+# Me
 Hello
-## Assistant
+
+# Assistant
 Hi there!
 ```
 
@@ -274,23 +279,41 @@ Hi there!
 	- JS-based drag handle on left edge (replaces janky CSS `resize`)
 - **Nested Lists (Viewer)**
 	- CSS styling for proper bullet hierarchy (disc → circle → square)
-## Phase 3: Medium Priority (Planned)
+## Phase 3: Performance & Robustness (Planned)
 - **Windows Filename Sanitization**
 	- Handle reserved names (CON, PRN, AUX, COM1-9, LPT1-9), trailing periods
 - **Settings Desync**
 	- Remove manual `thinkingCb` fetch, ensure all settings flow through `state.layout`
 - **Null/Empty Content**
 	- Graceful handling of empty messages
-## Phase 4: Polish & Features (Planned)
+- **Thread Blocking**
+	- Implement via chunked processing with `requestIdleCallback`
+	- Parse JSON in small batches to avoid UI freeze on large files
+- **DOM Node Explosion**
+	- Lazy DOM approach: only generate preview DOM for the note user clicked on
+	- Result cards remain as lightweight data until needed
+## Phase 4: UI/UX Polish (Planned)
 - **Search Bar**
 	- Filter results by filename/content
 - **Theme Toggle**
 	- Override `prefers-color-scheme` with manual control
 - **Bulk Selection**
 	- Checkboxes on result cards for selective export
+- **Responsiveness**
+	- Improve mobile close button (larger touch target)
+	- Better breakpoint behavior for mixed screen sizes
+- **Browser Compatibility**
+	- Make app browser-agnostic as much as possible
+	- Consistent styling across browsers (Firefox sliders, etc.)
+## Phase 5: Parser Decision (TBD)
+- **Custom vs. Library Parsers**
+	- Keep custom markdown parsers vs. switch to marked.js + Turndown.js
+	- Decision deferred until more edge cases surface
+	- Custom: full control, smaller bundle
+	- Library: more robust, larger bundle
+## Phase 6: Future Enhancements
 - **Export tutorials**
 	- collapsible "How to export?" per provider
-##  Phase 5: Future Enhancements
 - **Attachments handling** 
 	- extract refs, emit `![]()`, copy to `_attachments/`
 - **Filename collision robustness**
@@ -299,5 +322,5 @@ Hi there!
 	- AI Studio, Perplexity, or other providers (JSON structures to be provided)
 - **Schema fingerprinting detector**
 	- replace heuristic scoring with structural similarity matching
-- **Virtual Scrolling**
-	- For exports with 500+ conversations
+- Table from notes
+	- create a full table out of notes using filename and YAML properties, make A-Z sorting possible based on YAML properties
