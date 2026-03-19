@@ -8,13 +8,14 @@
         user_heading: '# Me',
         assistant_heading: '# Assistant',
         thinking_heading: '# Thinking',
-        include_thinking: true,
+        include_thinking: false,
         separator: '',
         heading_downscale: true,
         add_title_as_h1: false,
         timestamp_format: '%Y-%m-%d',
         gemini_group_gap_minutes: 30,
-        gemini_keep_ungrouped: false
+        gemini_keep_ungrouped: false,
+        viewer_enabled: true
     };
 
     var state = {
@@ -29,7 +30,8 @@
         hasThinking: false,
         layout: null,
         loading: false,
-        currentViewerFile: null
+        currentViewerFile: null,
+        viewerRaw: false
     };
 
     function loadSettings() {
@@ -94,6 +96,9 @@
         var closeViewerBtn = document.getElementById('closeViewerBtn');
         if (closeViewerBtn) closeViewerBtn.addEventListener('click', closeViewer);
 
+        var viewerToggle = document.getElementById('viewerToggle');
+        if (viewerToggle) viewerToggle.addEventListener('click', toggleViewerRaw);
+
         document.querySelectorAll('.settings-section input[type="checkbox"]').forEach(function(cb) {
             cb.addEventListener('change', onSettingChange);
         });
@@ -103,6 +108,8 @@
         document.querySelectorAll('.settings-section input[type="range"]').forEach(function(slider) {
             slider.addEventListener('input', onSliderInput);
         });
+        var sepSelect = document.getElementById('separatorSelect');
+        if (sepSelect) sepSelect.addEventListener('change', onSettingChange);
     }
 
     function onDragOver(e) {
@@ -197,7 +204,8 @@
         state.selectedProvider = provider;
         if (state.fileLoaded) {
             checkThinkingBlocks();
-            if (provider !== 'unknown') {
+            updateThinkingCheckbox();
+            if (provider !== 'auto' && provider !== Converter.PROVIDER_UNKNOWN) {
                 onConvert(true);
             }
         }
@@ -234,7 +242,7 @@
                 providerLabel = ' (' + capitalize(state.providerDetected) + ')';
             }
             if (label) label.textContent = 'Include thinking blocks' + providerLabel;
-            cb.checked = state.layout ? state.layout.include_thinking !== false : true;
+            cb.checked = state.layout ? state.layout.include_thinking : false;
         } else {
             cb.disabled = true;
             if (label) label.textContent = 'Include thinking blocks (not available for this file)';
@@ -275,6 +283,7 @@
                         break;
                     }
                 }
+                updateThinkingCheckbox();
 
                 var rendered = Converter.renderConversations(state.conversations, layout);
                 state.renderedFiles = rendered;
@@ -291,12 +300,20 @@
     function onSettingChange(e) {
         var el = e.target;
         var key = el.dataset.setting;
-        if (!key) return;
-        if (el.type === 'checkbox') {
-            setNestedValue(state.layout, key, el.checked);
-        } else {
-            setNestedValue(state.layout, key, el.value);
+
+        if (el.id === 'separatorSelect') {
+            state.layout.separator = el.value;
+        } else if (key) {
+            if (el.type === 'checkbox') {
+                setNestedValue(state.layout, key, el.checked);
+                if (key === 'include_thinking') {
+                    updateThinkingCheckbox();
+                }
+            } else {
+                setNestedValue(state.layout, key, el.value);
+            }
         }
+
         if (key === 'gemini_group_gap_minutes') updateSliderDisplay();
         saveSettings();
         if (state.fileLoaded) {
@@ -337,7 +354,11 @@
         setInput('userHeading', layout.user_heading || '# Me');
         setInput('assistantHeading', layout.assistant_heading || '# Assistant');
         setInput('thinkingHeading', layout.thinking_heading || '# Thinking');
-        setInput('separatorInput', layout.separator || '');
+
+        var sepValue = layout.separator || '';
+        var sepSelect = document.getElementById('separatorSelect');
+        if (sepSelect) sepSelect.value = sepValue;
+
         setInput('timestampFormat', layout.timestamp_format || '%Y-%m-%d');
         setCheckbox('headingDownscale', layout.heading_downscale !== false);
         setCheckbox('addTitleH1', layout.add_title_as_h1 === true);
@@ -355,6 +376,25 @@
     function setInput(id, value) {
         var el = document.getElementById(id);
         if (el) el.value = value;
+    }
+
+    function toggleViewerRaw() {
+        if (!state.currentViewerFile) return;
+        state.viewerRaw = !state.viewerRaw;
+        updateViewerToggleBtn();
+        refreshViewerIfOpen();
+    }
+
+    function updateViewerToggleBtn() {
+        var btn = document.getElementById('viewerToggle');
+        if (!btn) return;
+        if (state.viewerRaw) {
+            btn.classList.add('active');
+            btn.title = 'Show rendered preview';
+        } else {
+            btn.classList.remove('active');
+            btn.title = 'Show raw markdown';
+        }
     }
 
     function renderResults() {
@@ -381,26 +421,74 @@
             card.addEventListener('click', function() {
                 openViewer(file.filename);
             });
-            
+
+            var btn = document.createElement('button');
+            btn.className = 'btn-small';
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+            btn.title = 'Download';
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                Download.downloadFile(file.filename, file.content);
+            });
+            card.appendChild(btn);
+
             var title = document.createElement('span');
             title.className = 'card-title';
             title.textContent = file.filename;
             title.title = file.filename;
             card.appendChild(title);
-            
-            var btn = document.createElement('button');
-            btn.className = 'btn-small';
-            btn.textContent = 'DL';
-            btn.title = 'Download snippet';
-            btn.addEventListener('click', (function(f) {
-                return function(e) { 
-                    e.stopPropagation();
-                    Download.downloadFile(f.filename, f.content); 
-                };
-            })(file));
-            card.appendChild(btn);
+
             container.appendChild(card);
         });
+    }
+
+    function parseBasicMarkdown(md) {
+        if (!md) return '';
+        var html = md;
+
+        html = html.replace(/^---\n([\s\S]*?)\n---/g, '<div class="yaml-frontmatter">$1</div>');
+
+        html = html.replace(/^###### (.*$)/gim, '<h6>$1</h6>');
+        html = html.replace(/^##### (.*$)/gim, '<h5>$1</h5>');
+        html = html.replace(/^#### (.*$)/gim, '<h4>$1</h4>');
+        html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+        html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+        html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+
+        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+        html = html.replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>');
+
+        html = html.replace(/^\* (.*$)/gim, '<ul><li>$1</li></ul>');
+        html = html.replace(/<\/ul>\n<ul>/g, '\n');
+
+        html = html.replace(/```[\s\S]*?```/g, function(m) {
+            return '<pre><code>' + m.slice(3, -3).replace(/```\w*\n?/g, '') + '</code></pre>';
+        });
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+        html = html.replace(/^\|(.+)\|/gim, function(match) {
+            var cells = match.split('|').filter(function(c) { return c.trim(); });
+            var row = '<tr>' + cells.map(function(c) { return '<td>' + c.trim() + '</td>'; }).join('') + '</tr>';
+            return row;
+        });
+        html = html.replace(/(<tr>[\s\S]*?<\/tr>(\n<tr>[\s\S]*?<\/tr>)*)/gi, '<table>$1</table>');
+        html = html.replace(/<td>(-+)<\/td>/g, '');
+
+        var lines = html.split('\n');
+        var inBlock = false;
+        var newLines = [];
+        for (var i = 0; i < lines.length; i++) {
+            var l = lines[i].trim();
+            var isBlockTag = /^(<h[1-6]|<p>|<ul>|<ol>|<pre|<blockquote|<table|<div)/.test(l) || /^(<\/|<ul><li)/.test(l) || l === '<li></li>' || l === '';
+            if (!isBlockTag && l !== '' && !l.startsWith('<')) {
+                newLines.push('<p>' + lines[i] + '</p>');
+            } else {
+                newLines.push(lines[i]);
+            }
+        }
+        return newLines.join('\n');
     }
 
     function openViewer(filename) {
@@ -411,9 +499,9 @@
         if (panel) panel.style.display = 'flex';
         var titleObj = document.getElementById('viewerTitle');
         if (titleObj) titleObj.textContent = file.filename;
-        var contentObj = document.getElementById('viewerContentText');
-        if (contentObj) contentObj.textContent = file.content;
-        
+        updateViewerToggleBtn();
+        showViewerContent(file.content);
+
         document.querySelectorAll('.result-card').forEach(function(el) {
             var titleEl = el.querySelector('.card-title');
             if (titleEl && titleEl.textContent === filename) {
@@ -424,13 +512,23 @@
         });
     }
 
+    function showViewerContent(content) {
+        var contentObj = document.getElementById('viewerContentText');
+        if (!contentObj) return;
+        if (state.viewerRaw) {
+            contentObj.className = 'raw-reader-view';
+            contentObj.textContent = content;
+        } else {
+            contentObj.className = 'markdown-reader-view';
+            contentObj.innerHTML = parseBasicMarkdown(content);
+        }
+    }
+
     function closeViewer() {
         state.currentViewerFile = null;
         var panel = document.getElementById('viewerPanel');
         if (panel) panel.style.display = 'none';
-        var contentObj = document.getElementById('viewerContentText');
-        if (contentObj) contentObj.textContent = '';
-        
+
         document.querySelectorAll('.result-card').forEach(function(el) {
             el.classList.remove('active');
         });
@@ -440,8 +538,7 @@
         if (!state.currentViewerFile) return;
         var file = state.renderedFiles.find(function(f) { return f.filename === state.currentViewerFile; });
         if (file) {
-            var contentObj = document.getElementById('viewerContentText');
-            if (contentObj) contentObj.textContent = file.content;
+            showViewerContent(file.content);
         } else {
             closeViewer();
         }
