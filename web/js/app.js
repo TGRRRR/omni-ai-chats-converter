@@ -80,6 +80,12 @@
             dropZone.addEventListener('dragleave', onDragLeave);
             dropZone.addEventListener('drop', onDrop);
             dropZone.addEventListener('click', function() { if (fileInput) fileInput.click(); });
+            dropZone.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (fileInput) fileInput.click();
+                }
+            });
         }
         if (fileInput) {
             fileInput.addEventListener('change', onFileSelect);
@@ -100,6 +106,11 @@
 
         var viewerToggle = document.getElementById('viewerToggle');
         if (viewerToggle) viewerToggle.addEventListener('click', toggleViewerRaw);
+
+        var resizeHandle = document.getElementById('viewerResizeHandle');
+        if (resizeHandle) {
+            resizeHandle.addEventListener('mousedown', onResizeStart);
+        }
 
         document.querySelectorAll('.settings-section input[type="checkbox"]').forEach(function(cb) {
             cb.addEventListener('change', onSettingChange);
@@ -428,7 +439,8 @@
 
             var btn = document.createElement('button');
             btn.className = 'btn-small';
-            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+            btn.setAttribute('aria-label', 'Download ' + file.filename);
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
             btn.title = 'Download';
             btn.addEventListener('click', function(e) {
                 e.stopPropagation();
@@ -568,7 +580,13 @@
         text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
         text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
         text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
-        text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+        text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function(match, label, href) {
+            var safeHref = href.trim();
+            if (!/^(https?:|mailto:|#|\/)/i.test(safeHref)) {
+                return '<span class="unsafe-link" title="Links with unsafe protocols are not allowed">' + label + '</span>';
+            }
+            return '<a href="' + safeHref + '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
+        });
         return text;
     }
 
@@ -689,6 +707,49 @@
                 if (toast.parentNode) toast.parentNode.removeChild(toast);
             }, 300);
         }, 3000);
+    }
+
+    var resizeState = { isResizing: false, startX: 0, startWidth: 0 };
+
+    function onResizeStart(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        resizeState.isResizing = true;
+        resizeState.startX = e.clientX;
+        var viewerPanel = document.getElementById('viewerPanel');
+        if (viewerPanel) {
+            resizeState.startWidth = viewerPanel.offsetWidth;
+        }
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+        var handle = document.getElementById('viewerResizeHandle');
+        if (handle) handle.classList.add('active');
+        document.addEventListener('mousemove', onResizeMove);
+        document.addEventListener('mouseup', onResizeEnd);
+    }
+
+    function onResizeMove(e) {
+        if (!resizeState.isResizing) return;
+        var viewerPanel = document.getElementById('viewerPanel');
+        if (!viewerPanel) return;
+        var diff = resizeState.startX - e.clientX;
+        var newWidth = resizeState.startWidth + diff;
+        var containerWidth = document.querySelector('.app-wrapper') ? document.querySelector('.app-wrapper').offsetWidth : window.innerWidth;
+        var minWidth = 300;
+        var maxWidth = containerWidth * 0.85;
+        if (newWidth < minWidth) newWidth = minWidth;
+        if (newWidth > maxWidth) newWidth = maxWidth;
+        viewerPanel.style.width = newWidth + 'px';
+    }
+
+    function onResizeEnd() {
+        resizeState.isResizing = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        var handle = document.getElementById('viewerResizeHandle');
+        if (handle) handle.classList.remove('active');
+        document.removeEventListener('mousemove', onResizeMove);
+        document.removeEventListener('mouseup', onResizeEnd);
     }
 
     if (document.readyState === 'loading') {

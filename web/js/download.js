@@ -15,44 +15,51 @@
     }
 
     function downloadZip(files, zipname) {
-        if (!files || files.length === 0) return;
-        var archive;
-        if (typeof global.Archive !== 'undefined') {
-            archive = new global.Archive(files.length);
-        } else {
-            try { archive = new Archive(files.length); }
-            catch (e) {
-                downloadFallback(files, zipname);
-                return;
-            }
-        }
-        for (var i = 0; i < files.length; i++) {
-            var file = files[i];
-            var blob = new Blob([file.content], { type: 'text/markdown;charset=utf-8' });
-            archive.addFile(file.filename, blob);
-        }
-        var archiveBlob;
-        try {
-            archiveBlob = archive.generate();
-        } catch (e) {
-            downloadFallback(files, zipname);
+        if (!files || files.length === 0) {
             return;
         }
-        var url = URL.createObjectURL(archiveBlob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = zipname || 'conversations.zip';
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-
-    function downloadFallback(files, zipname) {
-        for (var i = 0; i < files.length; i++) {
-            downloadFile(files[i].filename, files[i].content);
+        
+        // Check if JSZip is available
+        if (typeof JSZip === 'undefined') {
+            console.error('JSZip is not loaded!');
+            return;
         }
+        
+        var zip = new JSZip();
+        for (var i = 0; i < files.length; i++) {
+            zip.file(files[i].filename, files[i].content);
+        }
+        
+        var zipFilename = zipname || 'conversations.zip';
+        
+        zip.generateAsync({ type: 'blob' }).then(function(content) {
+            console.log('ZIP created, size:', content.size);
+            
+            // Create blob URL
+            var blob = content;
+            var url = URL.createObjectURL(blob);
+            
+            // Create download link
+            var link = document.createElement('a');
+            link.href = url;
+            link.download = zipFilename;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            
+            // Use timeout to ensure link is in DOM
+            setTimeout(function() {
+                link.click();
+                
+                // Cleanup
+                setTimeout(function() {
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                }, 100);
+            }, 0);
+            
+        }).catch(function(err) {
+            console.error('ZIP generation failed:', err);
+        });
     }
 
     var Download = {

@@ -85,10 +85,23 @@ header p { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
     background: var(--surface); transition: all 0.15s; margin-bottom: 12px;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
-.drop-zone:hover, .drop-zone.drag-over {
+.drop-zone:hover, .drop-zone.drag-over, .drop-zone:focus-visible {
     border-color: var(--accent); background: var(--bg);
 }
+.drop-zone:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
 .drop-zone input { display: none; }
+.sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
 .drop-zone-icon { color: var(--text-muted); margin-bottom: 4px; }
 .drop-zone-icon svg { width: 20px; height: 20px; }
 .drop-zone h3 { font-size: 13px; font-weight: 600; margin-bottom: 0; }
@@ -195,7 +208,14 @@ header p { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
     background: var(--bg); border-left: 1px solid var(--border);
     display: flex; flex-direction: column; z-index: 50;
     box-shadow: -4px 0 20px rgba(0,0,0,0.5);
-    resize: horizontal; overflow: auto;
+}
+.viewer-resize-handle {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 8px;
+    cursor: ew-resize; z-index: 60; background: transparent;
+    transition: background 0.15s;
+}
+.viewer-resize-handle:hover, .viewer-resize-handle.active {
+    background: var(--accent);
 }
 .viewer-header {
     display: flex; align-items: center;
@@ -230,6 +250,7 @@ header p { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
 .markdown-reader-view hr + p { margin-top: 12px; }
 .markdown-reader-view a { color: var(--accent); text-decoration: none; }
 .markdown-reader-view a:hover { text-decoration: underline; }
+.markdown-reader-view .unsafe-link { color: var(--text-muted); cursor: not-allowed; opacity: 0.6; }
 .markdown-reader-view pre.code-block { background-color: var(--surface); border-radius: 6px; padding: 12px; overflow: auto; font-family: Consolas, "Courier New", monospace; font-size: 13px; margin: 12px 0; border: 1px solid var(--border); }
 .markdown-reader-view pre.code-block code { background: none; padding: 0; font-size: 100%; border-radius: 0; }
 .markdown-reader-view code { background-color: rgba(110,118,129,0.2); border-radius: 4px; padding: 2px 4px; font-family: Consolas, "Courier New", monospace; font-size: 85%; }

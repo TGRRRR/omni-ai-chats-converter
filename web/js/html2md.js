@@ -110,14 +110,69 @@
         }
     }
 
-    function listToMarkdown(list, ordered) {
-        let md = '';
+    function listToMarkdown(list, ordered, indent) {
+        if (indent === undefined) indent = '';
+        let lines = [];
         const items = list.querySelectorAll(':scope > li');
         items.forEach((li, idx) => {
             const prefix = ordered ? (idx + 1) + '. ' : '* ';
-            let text = li.textContent.replace(/\n/g, ' ').replace(/^\s+/, '').replace(/\s+$/, '');
-            md += prefix + text + '\n';
+            const result = processListItem(li, prefix, indent);
+            lines.push(result);
         });
+        return lines.join('\n');
+    }
+
+    function processListItem(li, prefix, indent) {
+        let textContent = '';
+        let nestedLists = [];
+        const children = Array.from(li.childNodes);
+        
+        function processInline(nodes) {
+            let result = '';
+            for (let i = 0; i < nodes.length; i++) {
+                const node = nodes[i];
+                if (node.nodeType === Node.TEXT_NODE) {
+                    result += node.textContent;
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                    const tag = node.tagName.toUpperCase();
+                    if (tag === 'UL' || tag === 'OL') {
+                        nestedLists.push({ list: node, ordered: tag === 'OL' });
+                    } else if (tag === 'STRONG' || tag === 'B') {
+                        result += '**' + processInline(Array.from(node.childNodes)) + '**';
+                    } else if (tag === 'EM' || tag === 'I') {
+                        result += '*' + processInline(Array.from(node.childNodes)) + '*';
+                    } else if (tag === 'CODE') {
+                        result += '`' + node.textContent + '`';
+                    } else if (tag === 'A') {
+                        const href = node.getAttribute('href') || '';
+                        const linkText = processInline(Array.from(node.childNodes));
+                        if (href && href !== linkText) {
+                            result += '[' + linkText + '](' + href + ')';
+                        } else {
+                            result += linkText;
+                        }
+                    } else if (tag === 'BR') {
+                        result += ' ';
+                    } else if (tag === 'P') {
+                        result += processInline(Array.from(node.childNodes));
+                    } else {
+                        result += processInline(Array.from(node.childNodes));
+                    }
+                }
+            }
+            return result;
+        }
+        
+        textContent = processInline(children).replace(/\s+/g, ' ').trim();
+
+        let md = indent + prefix + textContent;
+
+        for (let i = 0; i < nestedLists.length; i++) {
+            const nested = nestedLists[i];
+            const nestedIndent = indent + '    ';
+            md += '\n' + listToMarkdown(nested.list, nested.ordered, nestedIndent);
+        }
+
         return md;
     }
 
@@ -146,21 +201,10 @@
     }
 
     function cleanupRegex(md) {
+        // DOMParser textContent already decodes standard HTML entities,
+        // so we only handle cases it doesn't handle automatically
         md = md.replace(/\xa0/g, ' ');
         md = md.replace(/&nbsp;/gi, ' ');
-        md = md.replace(/&lt;/g, '<');
-        md = md.replace(/&gt;/g, '>');
-        md = md.replace(/&amp;/g, '&');
-        md = md.replace(/&quot;/g, '"');
-        md = md.replace(/&#39;/g, "'");
-        md = md.replace(/&#x27;/g, "'");
-        md = md.replace(/&#x2F;/g, '/');
-        md = md.replace(/&mdash;/g, '---');
-        md = md.replace(/&ndash;/g, '--');
-        md = md.replace(/&hellip;/g, '...');
-        md = md.replace(/&copy;/g, '(C)');
-        md = md.replace(/&reg;/g, '(R)');
-        md = md.replace(/&trade;/g, '(TM)');
         md = md.replace(/<\/span>/gi, '');
         md = md.replace(/<span[^>]*>/gi, '');
         md = md.replace(/<\/div>/gi, '');
