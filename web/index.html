@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omni AI Converter</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="loadingOverlay">
+    <div class="spinner"></div>
+    <span>Loading...</span>
+</div>
+
+<div class="container">
+    <header>
+        <h1>Omni AI Converter</h1>
+        <p>Convert AI chat exports to Markdown</p>
+    </header>
+
+    <div class="provider-section">
+        <h2>Provider</h2>
+        <div class="provider-pills">
+            <button class="provider-pill active" data-provider="auto">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                Auto-detect
+            </button>
+            <button class="provider-pill" data-provider="claude">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                Claude
+            </button>
+            <button class="provider-pill" data-provider="deepseek">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r="0.5" fill="currentColor"/></svg>
+                DeepSeek
+            </button>
+            <button class="provider-pill" data-provider="gemini">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                Gemini
+            </button>
+            <button class="provider-pill" data-provider="chatgpt">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                ChatGPT
+            </button>
+        </div>
+    </div>
+
+    <div class="drop-zone" id="dropZone">
+        <input type="file" id="fileInput" accept=".json">
+        <div class="drop-zone-icon">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+        </div>
+        <h3>Drop your JSON file here</h3>
+        <p>or click to browse</p>
+    </div>
+
+    <div id="unknownFormatBanner">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+        Unknown format — please select a provider manually above.
+    </div>
+
+    <div class="settings-section">
+        <button class="settings-toggle" id="settingsToggle">Show Settings</button>
+        <div id="settingsPanel">
+            <div class="settings-group">
+                <h3>Frontmatter</h3>
+                <div class="settings-row">
+                    <label class="toggle-item"><input type="checkbox" id="fmTitle" data-setting="frontmatter.title" checked> Title</label>
+                    <label class="toggle-item"><input type="checkbox" id="fmDate" data-setting="frontmatter.date" checked> Date</label>
+                    <label class="toggle-item"><input type="checkbox" id="fmProvider" data-setting="frontmatter.provider" checked> Provider</label>
+                    <label class="toggle-item"><input type="checkbox" id="fmUrl" data-setting="frontmatter.url" checked> URL</label>
+                </div>
+            </div>
+            <div class="settings-group">
+                <h3>Headings</h3>
+                <div class="settings-row">
+                    <div class="text-item"><label>User heading</label><input type="text" id="userHeading" data-setting="user_heading" value="# Me"></div>
+                </div>
+                <div class="settings-row">
+                    <div class="text-item"><label>Assistant heading</label><input type="text" id="assistantHeading" data-setting="assistant_heading" value="# Assistant"></div>
+                </div>
+                <div class="settings-row">
+                    <div class="text-item"><label>Thinking heading</label><input type="text" id="thinkingHeading" data-setting="thinking_heading" value="# Thinking"></div>
+                </div>
+                <div class="settings-row">
+                    <div class="text-item"><label>Separator</label><input type="text" id="separatorInput" data-setting="separator" value=""></div>
+                </div>
+            </div>
+            <div class="settings-group">
+                <h3>Options</h3>
+                <div class="settings-row">
+                    <label class="toggle-item"><input type="checkbox" id="headingDownscale" data-setting="heading_downscale" checked> Downscale headings in assistant responses</label>
+                </div>
+                <div class="settings-row">
+                    <label class="toggle-item"><input type="checkbox" id="addTitleH1" data-setting="add_title_as_h1"> Add title as H1 at top of file</label>
+                </div>
+                <div class="settings-row">
+                    <label class="toggle-item"><input type="checkbox" id="thinkingCb"><span id="thinkingLabel">Include thinking blocks (not available for this file)</span></label>
+                </div>
+            </div>
+            <div class="settings-group">
+                <h3>Timestamp</h3>
+                <div class="settings-row">
+                    <div class="text-item"><label>Date format</label><input type="text" id="timestampFormat" data-setting="timestamp_format" value="%Y-%m-%d" placeholder="%Y-%m-%d"></div>
+                </div>
+            </div>
+            <div class="settings-group">
+                <h3>Gemini Options</h3>
+                <div class="settings-row">
+                    <div class="slider-item">
+                        <label>Group gap (minutes)</label>
+                        <input type="range" id="geminiGapSlider" data-setting="gemini_group_gap_minutes" min="5" max="120" value="30">
+                        <span id="geminiGapDisplay">30 min</span>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <label class="toggle-item"><input type="checkbox" id="geminiKeepUngrouped" data-setting="gemini_keep_ungrouped"><span>Keep each record as a separate file (no grouping)</span></label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="convert-row">
+        <button class="btn btn-primary" id="convertBtn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Convert
+        </button>
+    </div>
+
+    <div id="resultsSection">
+        <h2>Results <span id="resultCount"></span></h2>
+        <div id="resultsContainer"></div>
+        <div class="convert-row">
+            <button class="btn btn-primary" id="downloadAllBtn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Download All as ZIP
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="toastContainer"></div>
+
+<footer>
+    <a href="https://github.com/anomalyco/omni-ai-converter" target="_blank">GitHub</a>
+    <span>|</span>
+    <a href="#" target="_blank">Support on Ko-Fi</a>
+</footer>
+
+<script src="js/html2md.js"></script>
+<script src="js/converter.js"></script>
+<script src="js/download.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
