@@ -28,7 +28,8 @@
         renderedFiles: [],
         hasThinking: false,
         layout: null,
-        loading: false
+        loading: false,
+        currentViewerFile: null
     };
 
     function loadSettings() {
@@ -87,22 +88,19 @@
             });
         });
 
-        var convertBtn = document.getElementById('convertBtn');
-        if (convertBtn) convertBtn.addEventListener('click', onConvert);
-
         var downloadAllBtn = document.getElementById('downloadAllBtn');
         if (downloadAllBtn) downloadAllBtn.addEventListener('click', onDownloadAll);
 
-        var settingsToggle = document.getElementById('settingsToggle');
-        if (settingsToggle) settingsToggle.addEventListener('click', toggleSettings);
+        var closeViewerBtn = document.getElementById('closeViewerBtn');
+        if (closeViewerBtn) closeViewerBtn.addEventListener('click', closeViewer);
 
-        document.querySelectorAll('.settings-panel input[type="checkbox"]').forEach(function(cb) {
+        document.querySelectorAll('.settings-section input[type="checkbox"]').forEach(function(cb) {
             cb.addEventListener('change', onSettingChange);
         });
-        document.querySelectorAll('.settings-panel input[type="text"]').forEach(function(inp) {
+        document.querySelectorAll('.settings-section input[type="text"]').forEach(function(inp) {
             inp.addEventListener('change', onSettingChange);
         });
-        document.querySelectorAll('.settings-panel input[type="range"]').forEach(function(slider) {
+        document.querySelectorAll('.settings-section input[type="range"]').forEach(function(slider) {
             slider.addEventListener('input', onSliderInput);
         });
     }
@@ -161,7 +159,11 @@
                 updateThinkingCheckbox();
                 hideWarningBanner();
                 clearResults();
+                closeViewer();
                 showToast('File loaded: ' + file.name, 'success');
+                if (state.providerDetected !== 'unknown') {
+                    onConvert();
+                }
             } catch (err) {
                 showToast('Invalid JSON: ' + err.message, 'error');
                 state.fileLoaded = false;
@@ -193,7 +195,12 @@
 
     function selectProvider(provider) {
         state.selectedProvider = provider;
-        if (state.fileLoaded) checkThinkingBlocks();
+        if (state.fileLoaded) {
+            checkThinkingBlocks();
+            if (provider !== 'unknown') {
+                onConvert(true);
+            }
+        }
         updateProviderPills();
         if (provider !== 'auto' && state.providerDetected === 'unknown') hideWarningBanner();
     }
@@ -240,9 +247,9 @@
         return s.charAt(0).toUpperCase() + s.slice(1);
     }
 
-    function onConvert() {
+    function onConvert(silent) {
         if (!state.fileLoaded || !state.jsonData) {
-            showToast('Please load a file first.', 'error');
+            if (!silent) showToast('Please load a file first.', 'error');
             return;
         }
         showLoading(true);
@@ -272,7 +279,8 @@
                 var rendered = Converter.renderConversations(state.conversations, layout);
                 state.renderedFiles = rendered;
                 renderResults();
-                showToast('Converted ' + rendered.length + ' file(s)', 'success');
+                if (!silent) showToast('Converted ' + rendered.length + ' file(s)', 'success');
+                refreshViewerIfOpen();
             } catch (err) {
                 showToast('Error: ' + err.message, 'error');
             }
@@ -291,6 +299,9 @@
         }
         if (key === 'gemini_group_gap_minutes') updateSliderDisplay();
         saveSettings();
+        if (state.fileLoaded) {
+            onConvert(true);
+        }
     }
 
     function onSliderInput(e) {
@@ -313,14 +324,6 @@
             current = current[parts[i]];
         }
         current[parts[parts.length - 1]] = value;
-    }
-
-    function toggleSettings() {
-        var panel = document.getElementById('settingsPanel');
-        if (!panel) return;
-        var isOpen = panel.classList.toggle('open');
-        var toggle = document.getElementById('settingsToggle');
-        if (toggle) toggle.textContent = isOpen ? 'Hide Settings' : 'Show Settings';
     }
 
     function renderSettings() {
@@ -368,32 +371,80 @@
         }
         if (countEl) countEl.textContent = state.renderedFiles.length + ' file(s)';
         var dlAll = document.getElementById('downloadAllBtn');
-        if (dlAll) dlAll.style.display = '';
+        if (dlAll) dlAll.style.display = 'block';
         state.renderedFiles.forEach(function(file) {
             var card = document.createElement('div');
             card.className = 'result-card';
-            var header = document.createElement('div');
-            header.className = 'card-header';
+            if (file.filename === state.currentViewerFile) {
+                card.classList.add('active');
+            }
+            card.addEventListener('click', function() {
+                openViewer(file.filename);
+            });
+            
             var title = document.createElement('span');
             title.className = 'card-title';
             title.textContent = file.filename;
             title.title = file.filename;
-            header.appendChild(title);
+            card.appendChild(title);
+            
             var btn = document.createElement('button');
             btn.className = 'btn-small';
-            btn.textContent = 'Download';
+            btn.textContent = 'DL';
+            btn.title = 'Download snippet';
             btn.addEventListener('click', (function(f) {
-                return function() { Download.downloadFile(f.filename, f.content); };
+                return function(e) { 
+                    e.stopPropagation();
+                    Download.downloadFile(f.filename, f.content); 
+                };
             })(file));
-            header.appendChild(btn);
-            card.appendChild(header);
-            var preview = document.createElement('div');
-            preview.className = 'card-preview';
-            var previewText = file.content.substring(0, 300).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            preview.innerHTML = '<pre>' + previewText + '</pre>';
-            card.appendChild(preview);
+            card.appendChild(btn);
             container.appendChild(card);
         });
+    }
+
+    function openViewer(filename) {
+        var file = state.renderedFiles.find(function(f) { return f.filename === filename; });
+        if (!file) return;
+        state.currentViewerFile = filename;
+        var panel = document.getElementById('viewerPanel');
+        if (panel) panel.style.display = 'flex';
+        var titleObj = document.getElementById('viewerTitle');
+        if (titleObj) titleObj.textContent = file.filename;
+        var contentObj = document.getElementById('viewerContentText');
+        if (contentObj) contentObj.textContent = file.content;
+        
+        document.querySelectorAll('.result-card').forEach(function(el) {
+            var titleEl = el.querySelector('.card-title');
+            if (titleEl && titleEl.textContent === filename) {
+                el.classList.add('active');
+            } else {
+                el.classList.remove('active');
+            }
+        });
+    }
+
+    function closeViewer() {
+        state.currentViewerFile = null;
+        var panel = document.getElementById('viewerPanel');
+        if (panel) panel.style.display = 'none';
+        var contentObj = document.getElementById('viewerContentText');
+        if (contentObj) contentObj.textContent = '';
+        
+        document.querySelectorAll('.result-card').forEach(function(el) {
+            el.classList.remove('active');
+        });
+    }
+
+    function refreshViewerIfOpen() {
+        if (!state.currentViewerFile) return;
+        var file = state.renderedFiles.find(function(f) { return f.filename === state.currentViewerFile; });
+        if (file) {
+            var contentObj = document.getElementById('viewerContentText');
+            if (contentObj) contentObj.textContent = file.content;
+        } else {
+            closeViewer();
+        }
     }
 
     function clearResults() {

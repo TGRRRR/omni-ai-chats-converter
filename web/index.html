@@ -13,11 +13,24 @@
     <span>Loading...</span>
 </div>
 
-<div class="container">
-    <header>
-        <h1>Omni AI Converter</h1>
-        <p>Convert AI chat exports to Markdown</p>
-    </header>
+<div class="app-wrapper">
+    <div class="left-panel">
+        <header>
+            <h1>Omni AI Converter</h1>
+            <p>Convert AI chat exports to Markdown</p>
+        </header>
+
+        <div class="drop-zone" id="dropZone">
+            <input type="file" id="fileInput" accept=".json">
+            <div class="drop-zone-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+            </div>
+            <h3>Drop JSON file here</h3>
+        </div>
 
     <div class="provider-section">
         <h2>Provider</h2>
@@ -45,31 +58,17 @@
         </div>
     </div>
 
-    <div class="drop-zone" id="dropZone">
-        <input type="file" id="fileInput" accept=".json">
-        <div class="drop-zone-icon">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/>
-                <line x1="12" y1="3" x2="12" y2="15"/>
+        <div id="unknownFormatBanner">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
+            Unknown format
         </div>
-        <h3>Drop your JSON file here</h3>
-        <p>or click to browse</p>
-    </div>
 
-    <div id="unknownFormatBanner">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-            <line x1="12" y1="9" x2="12" y2="13"/>
-            <line x1="12" y1="17" x2="12.01" y2="17"/>
-        </svg>
-        Unknown format — please select a provider manually above.
-    </div>
-
-    <div class="settings-section">
-        <button class="settings-toggle" id="settingsToggle">Show Settings</button>
-        <div id="settingsPanel">
+        <div class="settings-section">
+            <div id="settingsPanel" class="open compact">
             <div class="settings-group">
                 <h3>Frontmatter</h3>
                 <div class="settings-row">
@@ -96,14 +95,10 @@
             </div>
             <div class="settings-group">
                 <h3>Options</h3>
-                <div class="settings-row">
-                    <label class="toggle-item"><input type="checkbox" id="headingDownscale" data-setting="heading_downscale" checked> Downscale headings in assistant responses</label>
-                </div>
-                <div class="settings-row">
-                    <label class="toggle-item"><input type="checkbox" id="addTitleH1" data-setting="add_title_as_h1"> Add title as H1 at top of file</label>
-                </div>
-                <div class="settings-row">
-                    <label class="toggle-item"><input type="checkbox" id="thinkingCb"><span id="thinkingLabel">Include thinking blocks (not available for this file)</span></label>
+                <div class="settings-row compact-row">
+                    <label class="toggle-item"><input type="checkbox" id="headingDownscale" data-setting="heading_downscale" checked> Downscale headings</label>
+                    <label class="toggle-item"><input type="checkbox" id="addTitleH1" data-setting="add_title_as_h1"> Add H1 title</label>
+                    <label class="toggle-item" title="(Not available for this file)"><input type="checkbox" id="thinkingCb"><span id="thinkingLabel">Include thinking</span></label>
                 </div>
             </div>
             <div class="settings-group">
@@ -116,52 +111,64 @@
                 <h3>Gemini Options</h3>
                 <div class="settings-row">
                     <div class="slider-item">
-                        <label>Group gap (minutes)</label>
+                        <label>Group gap (min)</label>
                         <input type="range" id="geminiGapSlider" data-setting="gemini_group_gap_minutes" min="5" max="120" value="30">
-                        <span id="geminiGapDisplay">30 min</span>
+                        <span id="geminiGapDisplay">30</span>
                     </div>
                 </div>
                 <div class="settings-row">
-                    <label class="toggle-item"><input type="checkbox" id="geminiKeepUngrouped" data-setting="gemini_keep_ungrouped"><span>Keep each record as a separate file (no grouping)</span></label>
+                    <label class="toggle-item"><input type="checkbox" id="geminiKeepUngrouped" data-setting="gemini_keep_ungrouped"><span>Keep separate records (no grouping)</span></label>
                 </div>
             </div>
         </div>
-    </div>
-
-    <div class="convert-row">
-        <button class="btn btn-primary" id="convertBtn">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7 10 12 15 17 10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            Convert
-        </button>
-    </div>
-
-    <div id="resultsSection">
-        <h2>Results <span id="resultCount"></span></h2>
-        <div id="resultsContainer"></div>
-        <div class="convert-row">
-            <button class="btn btn-primary" id="downloadAllBtn">
+        
+        <div class="sidebar-actions">
+            <button class="btn btn-primary" id="downloadAllBtn" style="display: none; width: 100%;">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                     <polyline points="7 10 12 15 17 10"/>
                     <line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
-                Download All as ZIP
+                Download ZIP
             </button>
         </div>
+        
+        <footer>
+            <a href="https://github.com/anomalyco/omni-ai-converter" target="_blank">GitHub</a>
+            <span>|</span>
+            <a href="#" target="_blank">Support on Ko-Fi</a>
+        </footer>
+    </div> <!-- /.settings-section -->
+    </div> <!-- /.left-panel -->
+
+    <!-- Right Column (File List) -->
+    <div class="right-panel">
+
+    <div id="resultsSection">
+        <h2>Results <span id="resultCount"></span></h2>
+        <div id="resultsContainer"></div>
     </div>
+    </div>
+
+    <!-- Viewer Panel (Hidden by default) -->
+    <div class="viewer-panel" id="viewerPanel" style="display: none;">
+        <div class="viewer-header">
+            <h2 id="viewerTitle">Note Title</h2>
+            <button class="btn-close" id="closeViewerBtn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        <div class="viewer-content">
+            <pre id="viewerContentText"></pre>
+        </div>
+    </div>
+
 </div>
 
 <div id="toastContainer"></div>
-
-<footer>
-    <a href="https://github.com/anomalyco/omni-ai-converter" target="_blank">GitHub</a>
-    <span>|</span>
-    <a href="#" target="_blank">Support on Ko-Fi</a>
-</footer>
 
 <script src="js/html2md.js"></script>
 <script src="js/converter.js"></script>
