@@ -324,3 +324,74 @@ Hi there!
 	- replace heuristic scoring with structural similarity matching
 - Table from notes
 	- create a full table out of notes using filename and YAML properties, make A-Z sorting possible based on YAML properties
+- Support importing multiple files at once, automatically group by provider
+
+# Obsidian Plugin Version (Planned)
+
+A native Obsidian plugin version is planned after the web version is complete. This would integrate directly with Obsidian vaults.
+
+## Architecture Differences
+
+| Component | Web App | Obsidian Plugin |
+|-----------|---------|-----------------|
+| File Input | Drag-drop zone | Modal with HTML5 file input |
+| Settings | Custom panel + localStorage | `PluginSettingTab` + `loadData()`/`saveData()` |
+| Preview | Side panel viewer | Modal with tabs (raw/rendered) |
+| Output | ZIP download | Direct `app.vault.create()` into vault |
+| UI | Two-column layout | Command palette → Modal workflow |
+
+## Code Reuse
+
+**Can be reused (minimal changes):**
+- `converter.js` — parser logic (pure JS)
+- `html2md.js` — HTML→Markdown conversion
+- Provider detection logic
+- Settings data model (map to Obsidian API)
+
+**Needs rewriting:**
+- Entry point → TypeScript `main.ts` extending `Plugin`
+- UI layer → Obsidian Modals
+- File output → `app.vault.create()` instead of ZIP
+- Settings UI → `PluginSettingTab`
+
+## Proposed Workflow
+
+```
+User runs command: "Omni AI Converter: Import chats"
+    ↓
+Modal opens with file drop zone
+    ↓
+User drops JSON file
+    ↓
+Auto-detect provider, show preview
+    ↓
+User clicks "Import to vault"
+    ↓
+Files created directly in vault (e.g., Chats/GPT/Conversation.md)
+```
+
+## Advantages
+
+- Direct vault integration — no ZIP download/unzip
+- Native Obsidian UI feel
+- Keyboard shortcuts via command palette
+- Built-in settings persistence
+- Potential for automation (watch folder, auto-import)
+
+## Tradeoffs
+
+- Obsidian-only (users must have Obsidian installed)
+- TypeScript required (current JS needs conversion)
+- Separate codebase to maintain (or share core logic via npm package)
+
+## Estimated Effort
+
+| Task | Effort |
+|------|--------|
+| Plugin scaffold (manifest, main.ts, build config) | 1-2 hours |
+| Port converter logic | 2-3 hours |
+| Build modal UI with file input | 3-4 hours |
+| Settings tab | 1-2 hours |
+| Vault file creation logic | 1 hour |
+| Testing | 2-3 hours |
+| **Total** | **10-15 hours** |
