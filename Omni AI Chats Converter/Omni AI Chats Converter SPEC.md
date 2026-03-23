@@ -1,11 +1,48 @@
 # Tasks
-- [ ] Come up with a better shorter name..?
-- [ ] Implement ChatGPT import
-- [ ] Turn into Obsidian Plugin
-- [ ] Implement proper Gemini import
-- [ ] Implement Multi-import
-- [ ] Implement Gemini AI Studio import
-- [ ] Implement handling attachments like documents and images
+- [ ] Filename collision robustness #performance
+	- improve `sanitize_filename()` to handle edge cases, Handle reserved names (CON, PRN, AUX, COM1-9, LPT1-9), trailing periods
+- [ ] Settings Desync #performance
+	- Remove manual `thinkingCb` fetch, ensure all settings flow through `state.layout`
+- [ ] Null/Empty Content #performance
+	- Graceful handling of empty messages
+- [ ] Thread Blocking #performance
+	- Implement via chunked processing with `requestIdleCallback`
+	- Parse JSON in small batches to avoid UI freeze on large files
+- [ ] DOM Node Explosion #performance
+	- Lazy DOM approach: only generate preview DOM for the note user clicked on
+	- Result cards remain as lightweight data until needed
+- [ ] Decide on Custom vs. Library Parsers #performance
+	- Keep custom markdown parsers vs. switch to marked.js + Turndown.js
+	- Decision deferred until more edge cases surface
+	- Custom: full control, smaller bundle
+	- Library: more robust, larger bundle
+- [ ] Browser Compatibility #performance
+	- Make app browser-agnostic as much as possible
+	- Consistent styling across browsers (Firefox sliders, etc.)
+- [ ] Come up with a better shorter name..? #UX
+- [ ] Search Bar #UX
+	- Filter results by filename/content
+- [ ] Theme Toggle #UX
+	- Override `prefers-color-scheme` with manual control
+- [ ] Bulk Selection #UX
+	- Checkboxes on result cards for selective export
+- [ ] Responsiveness #UX
+	- Improve mobile close button (larger touch target)
+	- Better breakpoint behavior for mixed screen sizes
+- [ ] Export tutorials #UX
+	- collapsible "How to export?" per provider
+- [ ] Table from notes #UX
+	- create a full table out of notes using filename and YAML properties, make A-Z sorting possible based on YAML properties
+- [ ] Support importing multiple files at once, automatically group by provider #feature
+- [ ] Implement ChatGPT import #feature
+- [ ] Implement Gemini import #feature
+- [ ] Implement Gemini AI Studio import #feature
+- [ ] Implement Perplexity import #feature
+- [ ] Attachments handling #feature 
+	- extract refs, emit `![]()`, copy to `_attachments/`
+- [ ] Schema fingerprinting detector #feature
+	- replace heuristic scoring with structural similarity matching
+- [ ] Turn into Obsidian Plugin #feature
 # Overview
 > Converts chat exports from AI providers into consistently formatted Markdown files.
 ## Features
@@ -97,6 +134,9 @@ Download individual files or ZIP archive
 Links are validated before rendering:
 - Allowed protocols: `http:`, `https:`, `mailto:`, `#`, `/`
 - Unsafe links (e.g., `javascript:`, `data:`) render as greyed-out text with tooltip
+**Accessibility:**
+- Drop zone focusable with Enter/Space, `sr-only` class on file input, `aria-label` attributes
+- `aria-hidden` on decorative SVGs, `aria-label` on interactive buttons
 ## JavaScript Data Model
 ```javascript
 // Message
@@ -216,7 +256,7 @@ Hello
 # Assistant
 Hi there!
 ```
-## HTML -> .MD
+## Conversion
 - **DOMParser** - zero dependencies, handles nesting, entity decoding, `<pre>` blocks correctly. Regex as **post-processing cleanup** only.
 1. **DOMParser** parses HTML string into a DOM tree
 2. **Custom tree walker** traverses DOM, emits Markdown:
@@ -245,89 +285,9 @@ Hi there!
    - colspan/rowspan in tables → emit warning, flatten to pipe-separated text
    - RTL whitespace → normalize without corrupting bidirectional markers
    - **Nested lists** → proper indentation with `  ` prefix for sub-items
-# Development
-## Core Implementation Complete
-1. ✅ `web/js/html2md.js`
-	- DOMParser + regex post-processing HTML→Markdown with nested list support
-2. ✅ `web/js/converter.js`
-	- detector (scored heuristics), 4 parsers (claude, deepseek, gemini, chatgpt), renderer, registry
-3. ✅ `web/js/download.js`
-	- file + ZIP downloads via JSZip
-4. ✅ `web/js/app.js`
-	- UI logic, state management, event handlers, markdown preview renderer with nested list support
-5. ✅ `web/index.html`
-	- app shell (two-column layout, provider pills, accessible drop zone, compact settings, viewer panel)
-6. ✅ `web/css/style.css`
-	- modern responsive styling (dark/light, system fonts, viewer panel with drag resize, nested list styling)
-7. ✅ `web/js/jszip.min.js`
-	- vendored JSZip library for reliable ZIP generation
-8. ✅ `server.py`
-	- local HTTP server (Python stdlib)
-## Phase 1: Critical Fixes (v1.1)
-- **ZIP Download**
-	- Replaced broken `Archive` API with JSZip, proper async generation
-- **XSS Vulnerability**
-	- Fixed link parsing to whitelist safe protocols only (`http:`, `https:`, `mailto:`, `#`, `/`)
-- **Keyboard Accessibility**
-	- Drop zone now focusable with Enter/Space, proper `sr-only` class on file input, `aria-label` attributes
-- **ARIA Support**
-	- Added `aria-hidden` to decorative SVGs, `aria-label` to interactive buttons
-## Phase 2: High Priority Fixes (v1.2)
-- **Nested Lists (html2md)**
-	- Proper recursive handling with `  ` indentation prefix
-- **Viewer Panel Resizing**
-	- JS-based drag handle on left edge (replaces janky CSS `resize`)
-- **Nested Lists (Viewer)**
-	- CSS styling for proper bullet hierarchy (disc → circle → square)
-## Phase 3: Performance & Robustness (Planned)
-- **Windows Filename Sanitization**
-	- Handle reserved names (CON, PRN, AUX, COM1-9, LPT1-9), trailing periods
-- **Settings Desync**
-	- Remove manual `thinkingCb` fetch, ensure all settings flow through `state.layout`
-- **Null/Empty Content**
-	- Graceful handling of empty messages
-- **Thread Blocking**
-	- Implement via chunked processing with `requestIdleCallback`
-	- Parse JSON in small batches to avoid UI freeze on large files
-- **DOM Node Explosion**
-	- Lazy DOM approach: only generate preview DOM for the note user clicked on
-	- Result cards remain as lightweight data until needed
-## Phase 4: UI/UX Polish (Planned)
-- **Search Bar**
-	- Filter results by filename/content
-- **Theme Toggle**
-	- Override `prefers-color-scheme` with manual control
-- **Bulk Selection**
-	- Checkboxes on result cards for selective export
-- **Responsiveness**
-	- Improve mobile close button (larger touch target)
-	- Better breakpoint behavior for mixed screen sizes
-- **Browser Compatibility**
-	- Make app browser-agnostic as much as possible
-	- Consistent styling across browsers (Firefox sliders, etc.)
-## Phase 5: Parser Decision (TBD)
-- **Custom vs. Library Parsers**
-	- Keep custom markdown parsers vs. switch to marked.js + Turndown.js
-	- Decision deferred until more edge cases surface
-	- Custom: full control, smaller bundle
-	- Library: more robust, larger bundle
-## Phase 6: Future Enhancements
-- **Export tutorials**
-	- collapsible "How to export?" per provider
-- **Attachments handling** 
-	- extract refs, emit `![]()`, copy to `_attachments/`
-- **Filename collision robustness**
-	- improve `sanitize_filename()` to handle edge cases
-- **New parsers**
-	- AI Studio, Perplexity, or other providers (JSON structures to be provided)
-- **Schema fingerprinting detector**
-	- replace heuristic scoring with structural similarity matching
-- Table from notes
-	- create a full table out of notes using filename and YAML properties, make A-Z sorting possible based on YAML properties
-- Support importing multiple files at once, automatically group by provider
-# Obsidian Plugin Version (Planned)
+## Obsidian Plugin Version (Planned)
 A native Obsidian plugin version is planned after the web version is complete. This would integrate directly with Obsidian vaults.
-## Architecture Differences
+### Architecture Differences
 | Component | Web App | Obsidian Plugin |
 |-----------|---------|-----------------|
 | File Input | Drag-drop zone | Modal with HTML5 file input |
@@ -335,7 +295,7 @@ A native Obsidian plugin version is planned after the web version is complete. T
 | Preview | Side panel viewer | Modal with tabs (raw/rendered) |
 | Output | ZIP download | Direct `app.vault.create()` into vault |
 | UI | Two-column layout | Command palette → Modal workflow |
-## Code Reuse
+### Code Reuse
 **Can be reused (minimal changes):**
 - `converter.js` — parser logic (pure JS)
 - `html2md.js` — HTML→Markdown conversion
@@ -346,7 +306,7 @@ A native Obsidian plugin version is planned after the web version is complete. T
 - UI layer → Obsidian Modals
 - File output → `app.vault.create()` instead of ZIP
 - Settings UI → `PluginSettingTab`
-## Proposed Workflow
+### Proposed Workflow
 ```
 User runs command: "Omni AI Converter: Import chats"
     ↓
@@ -360,23 +320,11 @@ User clicks "Import to vault"
     ↓
 Files created directly in vault (e.g., Chats/GPT/Conversation.md)
 ```
-## Advantages
-- Direct vault integration — no ZIP download/unzip
-- Native Obsidian UI feel
-- Keyboard shortcuts via command palette
+### Advantages
+- Direct vault integration - no ZIP download/unzip
 - Built-in settings persistence
 - Potential for automation (watch folder, auto-import)
-## Tradeoffs
+### Tradeoffs
 - Obsidian-only (users must have Obsidian installed)
 - TypeScript required (current JS needs conversion)
 - Separate codebase to maintain (or share core logic via npm package)
-## Estimated Effort
-| Task | Effort |
-|------|--------|
-| Plugin scaffold (manifest, main.ts, build config) | 1-2 hours |
-| Port converter logic | 2-3 hours |
-| Build modal UI with file input | 3-4 hours |
-| Settings tab | 1-2 hours |
-| Vault file creation logic | 1 hour |
-| Testing | 2-3 hours |
-| **Total** | **10-15 hours** |
