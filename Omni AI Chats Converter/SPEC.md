@@ -1,3 +1,11 @@
+# Tasks
+- [ ] Come up with a better shorter name..?
+- [ ] Implement ChatGPT import
+- [ ] Turn into Obsidian Plugin
+- [ ] Implement proper Gemini import
+- [ ] Implement Multi-import
+- [ ] Implement Gemini AI Studio import
+- [ ] Implement handling attachments like documents and images
 # Overview
 > Converts chat exports from AI providers into consistently formatted Markdown files.
 ## Features
@@ -9,7 +17,6 @@
 This project started because existing tools were either CLI-only, vendor-specific, or required complex setups. The goal was a single app that handles ChatGPT, Claude, DeepSeek, Gemini, and eventually other providers
 	- with fully customizable markdown output formatting.
 ### Other options
-
 | Tool | Type | Providers | Customizable Format |
 |------|------|-----------|-------------------|
 | `ai-chat-md-export` | CLI (npm/TS) | ChatGPT, Claude only | Fixed format |
@@ -17,7 +24,6 @@ This project started because existing tools were either CLI-only, vendor-specifi
 | AI Exporter (Chrome) | Browser ext | 10+ platforms | None |
 | `chatgpt-markdown` | CLI (Python) | ChatGPT only | `config.json` |
 None were local desktop GUI apps with unified multi-provider support + format customization.
-
 # Architecture
 ## File tree
 ```
@@ -41,7 +47,6 @@ omni-ai-chats-converter/
 ```
 **Key point:** `web/` is the entire application. `server.py` is a minimal static file server that opens a browser window. One vendored dependency (JSZip) for ZIP generation.
 ## Dependencies
-
 | Library | Purpose | Source |
 |---------|---------|--------|
 | JSZip | ZIP file generation | Vendored (`js/jszip.min.js`) |
@@ -152,7 +157,6 @@ Detection is structural, not just key-presence. Each provider has a set of **req
 | ChatGPT  | `messages[0].role` AND no `sender` (distinguishes from Claude) | Medium     |
 | Gemini   | `header` contains "Gemini"/"Bard", OR `safeHtmlItem` present   | High       |
 | Unknown  | None of the above matched                                      |            |
-
 Wrapper unwrapping: `conversations`, `chats`, `data`, `items`
 	- applied before detection.
 **Confidence scoring:** Each parser's `can_parse()` returns a confidence score (0–1). The detector picks the highest. If the top score is below a threshold, flag as "unknown format".
@@ -172,7 +176,6 @@ Parsers are tried in order of confidence. Highest confidence wins.
 4. Only if the user explicitly picks a provider does any parser run
 ## Layout
 ### Settings
-
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `frontmatter.title` | true | Include title in YAML |
@@ -208,14 +211,11 @@ date: 2024-01-15
 provider: claude
 url: https://claude.ai/chat/...
 ---
-
 # Me
 Hello
-
 # Assistant
 Hi there!
 ```
-
 ## HTML -> .MD
 - **DOMParser** - zero dependencies, handles nesting, entity decoding, `<pre>` blocks correctly. Regex as **post-processing cleanup** only.
 1. **DOMParser** parses HTML string into a DOM tree
@@ -325,13 +325,9 @@ Hi there!
 - Table from notes
 	- create a full table out of notes using filename and YAML properties, make A-Z sorting possible based on YAML properties
 - Support importing multiple files at once, automatically group by provider
-
 # Obsidian Plugin Version (Planned)
-
 A native Obsidian plugin version is planned after the web version is complete. This would integrate directly with Obsidian vaults.
-
 ## Architecture Differences
-
 | Component | Web App | Obsidian Plugin |
 |-----------|---------|-----------------|
 | File Input | Drag-drop zone | Modal with HTML5 file input |
@@ -339,23 +335,18 @@ A native Obsidian plugin version is planned after the web version is complete. T
 | Preview | Side panel viewer | Modal with tabs (raw/rendered) |
 | Output | ZIP download | Direct `app.vault.create()` into vault |
 | UI | Two-column layout | Command palette → Modal workflow |
-
 ## Code Reuse
-
 **Can be reused (minimal changes):**
 - `converter.js` — parser logic (pure JS)
 - `html2md.js` — HTML→Markdown conversion
 - Provider detection logic
 - Settings data model (map to Obsidian API)
-
 **Needs rewriting:**
 - Entry point → TypeScript `main.ts` extending `Plugin`
 - UI layer → Obsidian Modals
 - File output → `app.vault.create()` instead of ZIP
 - Settings UI → `PluginSettingTab`
-
 ## Proposed Workflow
-
 ```
 User runs command: "Omni AI Converter: Import chats"
     ↓
@@ -369,23 +360,17 @@ User clicks "Import to vault"
     ↓
 Files created directly in vault (e.g., Chats/GPT/Conversation.md)
 ```
-
 ## Advantages
-
 - Direct vault integration — no ZIP download/unzip
 - Native Obsidian UI feel
 - Keyboard shortcuts via command palette
 - Built-in settings persistence
 - Potential for automation (watch folder, auto-import)
-
 ## Tradeoffs
-
 - Obsidian-only (users must have Obsidian installed)
 - TypeScript required (current JS needs conversion)
 - Separate codebase to maintain (or share core logic via npm package)
-
 ## Estimated Effort
-
 | Task | Effort |
 |------|--------|
 | Plugin scaffold (manifest, main.ts, build config) | 1-2 hours |
